@@ -1,45 +1,36 @@
-# Structured Outputs
+# 结构化输出
 
-vLLM supports the generation of structured outputs using
-[xgrammar](https://github.com/mlc-ai/xgrammar) or
-[guidance](https://github.com/guidance-ai/llguidance) as backends.
-This document shows you some examples of the different options that are
-available to generate structured outputs.
+vLLM 支持生成结构化输出，可以选择 [xgrammar](https://github.com/mlc-ai/xgrammar) 或 [guidance](https://github.com/guidance-ai/llguidance) 作为后端。
+本文将为你介绍几种生成结构化输出的常见方式，并提供相关示例。
 
 !!! warning
-    If you are still using the following deprecated API fields, please update your code to use `structured_outputs` as demonstrated in the rest of this document:
+    如果你还在使用以下已废弃的 API 字段，请按本文档的方式将代码更新为 `structured_outputs`：
 
-    - `guided_json` -> `{"structured_outputs": {"json": ...}}` or `StructuredOutputsParams(json=...)`
-    - `guided_regex` -> `{"structured_outputs": {"regex": ...}}` or `StructuredOutputsParams(regex=...)`
-    - `guided_choice` -> `{"structured_outputs": {"choice": ...}}` or `StructuredOutputsParams(choice=...)`
-    - `guided_grammar` -> `{"structured_outputs": {"grammar": ...}}` or `StructuredOutputsParams(grammar=...)`
-    - `guided_whitespace_pattern` -> `{"structured_outputs": {"whitespace_pattern": ...}}` or `StructuredOutputsParams(whitespace_pattern=...)`
-    - `structural_tag` -> `{"structured_outputs": {"structural_tag": ...}}` or `StructuredOutputsParams(structural_tag=...)`
-    - `guided_decoding_backend` -> Remove this field from your request
+    - `guided_json` -> `{"structured_outputs": {"json": ...}}` 或 `StructuredOutputsParams(json=...)`
+    - `guided_regex` -> `{"structured_outputs": {"regex": ...}}` 或 `StructuredOutputsParams(regex=...)`
+    - `guided_choice` -> `{"structured_outputs": {"choice": ...}}` 或 `StructuredOutputsParams(choice=...)`
+    - `guided_grammar` -> `{"structured_outputs": {"grammar": ...}}` 或 `StructuredOutputsParams(grammar=...)`
+    - `guided_whitespace_pattern` -> `{"structured_outputs": {"whitespace_pattern": ...}}` 或 `StructuredOutputsParams(whitespace_pattern=...)`
+    - `structural_tag` -> `{"structured_outputs": {"structural_tag": ...}}` 或 `StructuredOutputsParams(structural_tag=...)`
+    - `guided_decoding_backend` -> 请移除此字段
 
-## Online Serving (OpenAI API)
+## 在线服务（OpenAI API）
 
-You can generate structured outputs using the OpenAI's [Completions](https://platform.openai.com/docs/api-reference/completions) and [Chat](https://platform.openai.com/docs/api-reference/chat) API.
+你可以通过 OpenAI 的 [Completions](https://platform.openai.com/docs/api-reference/completions) 和 [Chat](https://platform.openai.com/docs/api-reference/chat) API 生成结构化输出。
 
-The following parameters are supported, which must be added as extra parameters:
+支持的参数如下，请作为额外参数添加：
 
-- `choice`: the output will be exactly one of the choices.
-- `regex`: the output will follow the regex pattern.
-- `json`: the output will follow the JSON schema.
-- `grammar`: the output will follow the context free grammar.
-- `structural_tag`: Follow a JSON schema within a set of specified tags within the generated text.
+- `choice`：输出会严格为指定选项之一。
+- `regex`：输出会符合正则表达式规则。
+- `json`：输出会符合指定的 JSON schema（模式）。
+- `grammar`：输出会符合上下文无关语法（context free grammar）。
+- `structural_tag`：在生成文本中，指定标签范围内遵循特定 JSON schema。
 
-You can see the complete list of supported parameters on the [OpenAI-Compatible Server](../serving/openai_compatible_server.md) page.
+完整参数列表可参考 [OpenAI-Compatible Server](../serving/openai_compatible_server.md) 页面。
 
-Structured outputs are supported by default in the OpenAI-Compatible Server. You
-may choose to specify the backend to use by setting the
-`--structured-outputs-config.backend` flag to `vllm serve`. The default backend is `auto`,
-which will try to choose an appropriate backend based on the details of the
-request. You may also choose a specific backend, along with
-some options. A full set of options is available in the `vllm serve --help`
-text.
+OpenAI-Compatible Server 默认支持结构化输出。你可通过设置 `--structured-outputs-config.backend` 参数指定后端，默认值为 `auto`，会根据请求自动选择合适的后端。你也可以指定特定后端以及相关选项，全部可选项可在 `vllm serve --help` 查看。
 
-Now let´s see an example for each of the cases, starting with the `choice`, as it´s the easiest one:
+接下来我们以最简单的 `choice` 示例开始讲解：
 
 ??? code
 
@@ -61,7 +52,7 @@ Now let´s see an example for each of the cases, starting with the `choice`, as 
     print(completion.choices[0].message.content)
     ```
 
-The next example shows how to use the `regex`. The idea is to generate an email address, given a simple regex template:
+下一个例子展示了如何使用 `regex` 生成一个符合简单正则模板的邮箱地址：
 
 ??? code
 
@@ -79,13 +70,13 @@ The next example shows how to use the `regex`. The idea is to generate an email 
     print(completion.choices[0].message.content)
     ```
 
-One of the most relevant features in structured text generation is the option to generate a valid JSON with pre-defined fields and formats.
-For this we can use the `json` parameter in two different ways:
+结构化文本生成最实用的功能之一，就是可以生成包含预定义字段和格式的有效 JSON。
+为此，可以通过两种方式使用 `json` 参数：
 
-- Using directly a [JSON Schema](https://json-schema.org/)
-- Defining a [Pydantic model](https://docs.pydantic.dev/latest/) and then extracting the JSON Schema from it (which is normally an easier option).
+- 直接使用 [JSON Schema](https://json-schema.org/)
+- 定义 [Pydantic 模型](https://docs.pydantic.dev/latest/)，并通过模型自动提取 JSON Schema（通常更易用）
 
-The next example shows how to use the `response_format` parameter with a Pydantic model:
+下面这个例子展示了如何结合 Pydantic 模型和 `response_format` 参数生成结构化 JSON：
 
 ??? code
 
@@ -126,14 +117,11 @@ The next example shows how to use the `response_format` parameter with a Pydanti
     ```
 
 !!! tip
-    While not strictly necessary, normally it´s better to indicate in the prompt the
-    JSON schema and how the fields should be populated. This can improve the
-    results notably in most cases.
+    虽然不是强制要求，但通常建议在提示词中明确说明 JSON schema 及各字段的填写方式，这样能显著提升生成效果。
 
-Finally we have the `grammar` option, which is probably the most
-difficult to use, but it´s really powerful. It allows us to define complete
-languages like SQL queries. It works by using a context free EBNF grammar.
-As an example, we can use to define a specific format of simplified SQL queries:
+最后，我们来讲解 `grammar` 选项。它虽然较为复杂，但非常强大，可以让我们定义完整的语言格式（比如 SQL 查询语句）。其原理是利用上下文无关 EBNF 语法。
+
+下面的例子定义了一个简化版 SQL 查询语法，并生成相应内容：
 
 ??? code
 
@@ -165,17 +153,17 @@ As an example, we can use to define a specific format of simplified SQL queries:
     print(completion.choices[0].message.content)
     ```
 
-See also: [full example](../examples/online_serving/structured_outputs.md)
+相关内容可参考：[完整示例](../examples/online_serving/structured_outputs.md)
 
-## Reasoning Outputs
+## 推理输出
 
-You can also use structured outputs with <project:#reasoning-outputs> for reasoning models.
+你还可以在 <project:#reasoning-outputs> 中结合结构化输出，用于推理类模型。
 
 ```bash
 vllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-7B --reasoning-parser deepseek_r1
 ```
 
-Note that you can use reasoning with any provided structured outputs feature. The following uses one with JSON schema:
+注意，推理功能可与任何结构化输出参数共同使用。下面展示了结合 JSON schema 的用法：
 
 ??? code
 
@@ -208,17 +196,17 @@ Note that you can use reasoning with any provided structured outputs feature. Th
     print("content: ", completion.choices[0].message.content)
     ```
 
-See also: [full example](../examples/online_serving/structured_outputs.md)
+更多用法请参考：[完整示例](../examples/online_serving/structured_outputs.md)
 
-## Experimental Automatic Parsing (OpenAI API)
+## 实验性自动解析（OpenAI API）
 
-This section covers the OpenAI beta wrapper over the `client.chat.completions.create()` method that provides richer integrations with Python specific types.
+本节介绍 OpenAI 针对 `client.chat.completions.create()` 方法的 beta 包装器，可自动和 Python 类型深度集成。
 
-At the time of writing (`openai==1.54.4`), this is a "beta" feature in the OpenAI client library. Code reference can be found [here](https://github.com/openai/openai-python/blob/52357cff50bee57ef442e94d78a0de38b4173fc2/src/openai/resources/beta/chat/completions.py#L100-L104).
+在撰写本文时（`openai==1.54.4`），这是 OpenAI 客户端库中的 "beta" 功能。代码参考见 [这里](https://github.com/openai/openai-python/blob/52357cff50bee57ef442e94d78a0de38b4173fc2/src/openai/resources/beta/chat/completions.py#L100-L104)。
 
-For the following examples, vLLM was set up using `vllm serve meta-llama/Llama-3.1-8B-Instruct`
+以下示例假设 vLLM 已使用 `vllm serve meta-llama/Llama-3.1-8B-Instruct` 启动。
 
-Here is a simple example demonstrating how to get structured output using Pydantic models:
+下面是一个简单示例，展示如何使用 Pydantic 模型获取结构化输出：
 
 ??? code
 
@@ -254,7 +242,7 @@ Name: Cameron
 Age: 28
 ```
 
-Here is a more complex example using nested Pydantic models to handle a step-by-step math solution:
+下面是一个更复杂的嵌套 Pydantic 模型示例，可用于分步骤展示数学解题过程：
 
 ??? code
 
@@ -288,7 +276,7 @@ Here is a more complex example using nested Pydantic models to handle a step-by-
     print("Answer:", message.parsed.final_answer)
     ```
 
-Output:
+输出示例：
 
 ```console
 ParsedChatCompletionMessage[MathResponse](content='{ "steps": [{ "explanation": "First, let\'s isolate the term with the variable \'x\'. To do this, we\'ll subtract 31 from both sides of the equation.", "output": "8x + 31 - 31 = 2 - 31"}, { "explanation": "By subtracting 31 from both sides, we simplify the equation to 8x = -29.", "output": "8x = -29"}, { "explanation": "Next, let\'s isolate \'x\' by dividing both sides of the equation by 8.", "output": "8x / 8 = -29 / 8"}], "final_answer": "x = -29/8" }', refusal=None, role='assistant', audio=None, function_call=None, tool_calls=[], parsed=MathResponse(steps=[Step(explanation="First, let's isolate the term with the variable 'x'. To do this, we'll subtract 31 from both sides of the equation.", output='8x + 31 - 31 = 2 - 31'), Step(explanation='By subtracting 31 from both sides, we simplify the equation to 8x = -29.', output='8x = -29'), Step(explanation="Next, let's isolate 'x' by dividing both sides of the equation by 8.", output='8x / 8 = -29 / 8')], final_answer='x = -29/8'))
@@ -298,13 +286,12 @@ Step #2: explanation="Next, let's isolate 'x' by dividing both sides of the equa
 Answer: x = -29/8
 ```
 
-An example of using `structural_tag` can be found here: [examples/online_serving/structured_outputs](../../examples/online_serving/structured_outputs)
+关于 `structural_tag` 的使用范例，请见：[examples/online_serving/structured_outputs](../../examples/online_serving/structured_outputs)
 
-## Offline Inference
+## 离线推理
 
-Offline inference allows for the same types of structured outputs.
-To use it, we´ll need to configure the structured outputs using the class `StructuredOutputsParams` inside `SamplingParams`.
-The main available options inside `StructuredOutputsParams` are:
+离线推理同样支持结构化输出功能。
+要使用此功能，可以在 `SamplingParams` 中配置 `StructuredOutputsParams` 类，例如：
 
 - `json`
 - `regex`
@@ -312,9 +299,7 @@ The main available options inside `StructuredOutputsParams` are:
 - `grammar`
 - `structural_tag`
 
-These parameters can be used in the same way as the parameters from the Online
-Serving examples above. One example for the usage of the `choice` parameter is
-shown below:
+这些参数用法与在线服务示例相同。下面是一个使用 `choice` 参数的离线推理示例：
 
 ??? code
 
@@ -333,4 +318,4 @@ shown below:
     print(outputs[0].outputs[0].text)
     ```
 
-See also: [full example](../examples/online_serving/structured_outputs.md)
+更多内容请参考：[完整示例](../examples/online_serving/structured_outputs.md)

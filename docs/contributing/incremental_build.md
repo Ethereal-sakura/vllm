@@ -1,12 +1,12 @@
-# Incremental Compilation Workflow
+# 增量编译工作流程
 
-When working on vLLM's C++/CUDA kernels located in the `csrc/` directory, recompiling the entire project with `uv pip install -e .` for every change can be time-consuming. An incremental compilation workflow using CMake allows for faster iteration by only recompiling the necessary components after an initial setup. This guide details how to set up and use such a workflow, which complements your editable Python installation.
+当你在 vLLM 的 C++/CUDA 内核（位于 `csrc/` 目录）进行开发时，每次修改后都用 `uv pip install -e .` 重新编译整个项目会非常耗时。借助 CMake 的增量编译工作流，只需在初始设置后编译必要的部分，大大加快迭代速度。本指南将介绍如何配置和使用这种工作流程，以配合你的 Python 可编辑安装。
 
-## Prerequisites
+## 前置条件
 
-Before setting up the incremental build:
+在开始设置增量构建之前：
 
-1. **vLLM Editable Install:** Ensure you have vLLM installed from source in an editable mode. Using pre-compiled wheels for the initial editable setup can be faster, as the CMake workflow will handle subsequent kernel recompilations.
+1. **vLLM 可编辑安装：** 请确保你已经从源码以可编辑模式安装了 vLLM。初始安装时使用预编译的 wheel 可以加快速度，后续的内核编译会由 CMake 处理。
 
     ```console
     uv venv --python 3.12 --seed
@@ -14,47 +14,47 @@ Before setting up the incremental build:
     VLLM_USE_PRECOMPILED=1 uv pip install -U -e . --torch-backend=auto
     ```
 
-2. **CUDA Toolkit:** Verify that the NVIDIA CUDA Toolkit is correctly installed and `nvcc` is accessible in your `PATH`. CMake relies on `nvcc` to compile CUDA code. You can typically find `nvcc` in `$CUDA_HOME/bin/nvcc` or by running `which nvcc`. If you encounter issues, refer to the [official CUDA Toolkit installation guides](https://developer.nvidia.com/cuda-toolkit-archive) and vLLM's main [GPU installation documentation](../getting_started/installation/gpu.md#troubleshooting) for troubleshooting. The `CMAKE_CUDA_COMPILER` variable in your `CMakeUserPresets.json` should also point to your `nvcc` binary.
+2. **CUDA 工具包：** 确认 NVIDIA CUDA Toolkit 已正确安装，并且 `nvcc` 命令可以在你的 `PATH` 中找到。CMake 需要通过 `nvcc` 编译 CUDA 代码。你通常可以在 `$CUDA_HOME/bin/nvcc` 找到它，或者用 `which nvcc` 进行查询。如果遇到问题，请参考 [CUDA 官方安装指南](https://developer.nvidia.com/cuda-toolkit-archive) 和 vLLM 的 [GPU 安装文档](../getting_started/installation/gpu.md#troubleshooting) 获取帮助。同时，`CMAKE_CUDA_COMPILER` 变量需要指向你的 `nvcc` 路径（可在 `CMakeUserPresets.json` 设置）。
 
-3. **Build Tools:** It is highly recommended to install `ccache` for fast rebuilds by caching compilation results (e.g., `sudo apt install ccache` or `conda install ccache`). Also, ensure the core build dependencies like `cmake` and `ninja` are installed. These are installable through `requirements/build.txt` or your system's package manager.
+3. **编译工具：** 强烈建议安装 `ccache`，它能缓存编译结果，显著加快构建速度（例如：`sudo apt install ccache` 或 `conda install ccache`）。还要确保基本构建依赖项如 `cmake` 和 `ninja` 已安装。这些依赖可以通过 `requirements/build.txt` 或系统包管理器安装。
 
     ```console
     uv pip install -r requirements/build.txt --torch-backend=auto
     ```
 
-## Setting up the CMake Build Environment
+## 配置 CMake 构建环境
 
-The incremental build process is managed through CMake. You can configure your build settings using a `CMakeUserPresets.json` file at the root of the vLLM repository.
+增量编译流程由 CMake 管理。你可以通过在 vLLM 仓库根目录创建 `CMakeUserPresets.json` 文件来配置你的构建参数。
 
-### Generate `CMakeUserPresets.json` using the helper script
+### 用辅助脚本生成 `CMakeUserPresets.json`
 
-To simplify the setup, vLLM provides a helper script that attempts to auto-detect your system's configuration (like CUDA path, Python environment, and CPU cores) and generates the `CMakeUserPresets.json` file for you.
+为简化配置，vLLM 提供了一个辅助脚本，可自动检测你的系统环境（如 CUDA 路径、Python 环境、CPU 核心数），并生成 `CMakeUserPresets.json`。
 
-**Run the script:**
+**运行脚本：**
 
-Navigate to the root of your vLLM clone and execute the following command:
+切换到 vLLM 仓库根目录，执行下列命令：
 
 ```console
 python tools/generate_cmake_presets.py
 ```
 
-The script will prompt you if it cannot automatically determine certain paths (e.g., `nvcc` or a specific Python executable for your vLLM development environment). Follow the on-screen prompts. If an existing `CMakeUserPresets.json` is found, the script will ask for confirmation before overwriting it.
+如果脚本无法自动确定某些路径（比如 `nvcc` 或你的 vLLM 开发环境下的 Python 可执行文件），它会提示你输入相关信息。按照屏幕提示操作即可。如果检测到已有 `CMakeUserPresets.json`，脚本会询问是否覆盖。
 
-**Force overwrite existing file:**
+**强制覆盖已有文件：**
 
-To automatically overwrite an existing `CMakeUserPresets.json` without prompting, use the `--force-overwrite` flag:
+如果你不希望有交互式提示，可以加上 `--force-overwrite` 参数，自动覆盖旧文件：
 
 ```console
 python tools/generate_cmake_presets.py --force-overwrite
 ```
 
-This is particularly useful in automated scripts or CI/CD environments where interactive prompts are not desired.
+这对于自动化脚本或 CI/CD 环境特别方便。
 
-After running the script, a `CMakeUserPresets.json` file will be created in the root of your vLLM repository.
+运行完毕后，根目录下会生成一个新的 `CMakeUserPresets.json` 文件。
 
-### Example `CMakeUserPresets.json`
+### 示例 `CMakeUserPresets.json`
 
-Below is an example of what the generated `CMakeUserPresets.json` might look like. The script will tailor these values based on your system and any input you provide.
+下面是一个可能生成的 `CMakeUserPresets.json` 示例，实际内容会根据你的系统环境和输入自动调整。
 
 ```json
 {
@@ -93,43 +93,43 @@ Below is an example of what the generated `CMakeUserPresets.json` might look lik
 }
 ```
 
-**What do the various configurations mean?**
+**各配置项含义说明：**
 
-- `CMAKE_CUDA_COMPILER`: Path to your `nvcc` binary. The script attempts to find this automatically.
-- `CMAKE_C_COMPILER_LAUNCHER`, `CMAKE_CXX_COMPILER_LAUNCHER`, `CMAKE_CUDA_COMPILER_LAUNCHER`: Setting these to `ccache` (or `sccache`) significantly speeds up rebuilds by caching compilation results. Ensure `ccache` is installed (e.g., `sudo apt install ccache` or `conda install ccache`). The script sets these by default.
-- `VLLM_PYTHON_EXECUTABLE`: Path to the Python executable in your vLLM development environment. The script will prompt for this, defaulting to the current Python environment if suitable.
-- `CMAKE_INSTALL_PREFIX: "${sourceDir}"`: Specifies that the compiled components should be installed back into your vLLM source directory. This is crucial for the editable install, as it makes the newly built kernels immediately available to your Python environment.
-- `CMAKE_JOB_POOLS` and `jobs` in build presets: Control the parallelism of the build. The script sets these based on the number of CPU cores detected on your system.
-- `binaryDir`: Specifies where the build artifacts will be stored (e.g., `cmake-build-release`).
+- `CMAKE_CUDA_COMPILER`：你的 `nvcc` 路径，脚本会自动检测设置。
+- `CMAKE_C_COMPILER_LAUNCHER`, `CMAKE_CXX_COMPILER_LAUNCHER`, `CMAKE_CUDA_COMPILER_LAUNCHER`：指定为 `ccache`（或 `sccache`），能大幅加速编译。请确保已安装 `ccache`（如 `sudo apt install ccache` 或 `conda install ccache`）。脚本会默认设置。
+- `VLLM_PYTHON_EXECUTABLE`：你的 vLLM 开发环境下 Python 的路径。脚本会根据环境自动设置或提示输入。
+- `CMAKE_INSTALL_PREFIX: "${sourceDir}"`：指定编译好的组件安装到 vLLM 源码目录。这对可编辑安装非常重要，确保新编译的内核能被 Python 环境及时加载。
+- `CMAKE_JOB_POOLS` 和 build presets 里的 `jobs`：控制构建并行度。脚本会根据你的 CPU 核心数自动设置。
+- `binaryDir`：指定构建输出目录，比如 `cmake-build-release`。
 
-## Building and Installing with CMake
+## 用 CMake 编译和安装
 
-Once your `CMakeUserPresets.json` is configured:
+配置好 `CMakeUserPresets.json` 后：
 
-1. **Initialize the CMake build environment:**
-   This step configures the build system according to your chosen preset (e.g., `release`) and creates the build directory at `binaryDir`
+1. **初始化 CMake 构建环境：**
+   根据你选择的 preset（如 `release`），配置构建系统，并在 `binaryDir` 目录下生成相关文件。
 
     ```console
     cmake --preset release
     ```
 
-2. **Build and install the vLLM components:**
-   This command compiles the code and installs the resulting binaries into your vLLM source directory, making them available to your editable Python installation.
+2. **编译并安装 vLLM 组件：**
+   该命令会编译源码，并将生成的二进制文件安装到 vLLM 源码目录，使你的 Python 可编辑安装立即可用。
 
     ```console
     cmake --build --preset release --target install
     ```
 
-3. **Make changes and repeat!**
-    Now you start using your editable install of vLLM, testing and making changes as needed. If you need to build again to update based on changes, simply run the CMake command again to build only the affected files.
+3. **修改和重复编译：**
+    现在你可以在 vLLM 可编辑安装环境下进行开发和测试了。每当你有新的更改，只需再次运行 CMake 构建命令，会只编译受影响的文件，节省大量时间。
 
     ```console
     cmake --build --preset release --target install
     ```
 
-## Verifying the Build
+## 验证构建结果
 
-After a successful build, you will find a populated build directory (e.g., `cmake-build-release/` if you used the `release` preset and the example configuration).
+编译成功后，你会在构建目录（比如 `cmake-build-release/`，如果用的是 `release` preset 和示例配置）看到生成的文件：
 
 ```console
 > ls cmake-build-release/
@@ -140,10 +140,10 @@ CMakeCache.txt  ctest                    _flashmla_C.abi3.so                  mo
 CMakeFiles      cumem_allocator.abi3.so  install_local_manifest.txt           vllm-flash-attn
 ```
 
-The `cmake --build ... --target install` command copies the compiled shared libraries (like `_C.abi3.so`, `_moe_C.abi3.so`, etc.) into the appropriate `vllm` package directory within your source tree. This updates your editable installation with the newly compiled kernels.
+通过 `cmake --build ... --target install` 命令，编译好的共享库（如 `_C.abi3.so`, `_moe_C.abi3.so` 等）会被复制到源码树里的 vllm 包目录，更新了你的可编辑安装环境，使新编译的内核立刻可用。
 
-## Additional Tips
+## 其他实用建议
 
-- **Adjust Parallelism:** Fine-tune the `CMAKE_JOB_POOLS` in `configurePresets` and `jobs` in `buildPresets` in your `CMakeUserPresets.json`. Too many jobs can overload systems with limited RAM or CPU cores, leading to slower builds or system instability. Too few won't fully utilize available resources.
-- **Clean Builds When Necessary:** If you encounter persistent or strange build errors, especially after significant changes or switching branches, consider removing the CMake build directory (e.g., `rm -rf cmake-build-release`) and re-running the `cmake --preset` and `cmake --build` commands.
-- **Specific Target Builds:** For even faster iterations when working on a specific module, you can sometimes build a specific target instead of the full `install` target, though `install` ensures all necessary components are updated in your Python environment. Refer to CMake documentation for more advanced target management.
+- **调整并行度：** 根据你的内存和 CPU 情况，适当调整 `CMAKE_JOB_POOLS` 和 `jobs` 数量。并行度过高可能导致系统负载过重或内存不足，反而拖慢编译；设置太低又无法充分利用硬件资源。
+- **必要时清理构建目录：** 如果遇到持续或异常的构建错误，尤其是在大幅更新或切换分支后，建议删除 CMake 构建目录（比如 `rm -rf cmake-build-release`），然后重新运行 `cmake --preset` 和 `cmake --build`。
+- **指定目标模块编译：** 如果只需快速迭代某个模块，可以只编译相关 target，而不是全部 `install`。不过 `install` 能确保所有必要组件都被更新。更多高级 target 管理请参考 CMake 官方文档。

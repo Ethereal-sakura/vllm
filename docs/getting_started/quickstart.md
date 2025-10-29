@@ -1,22 +1,22 @@
-# Quickstart
+# 快速入门
 
-This guide will help you quickly get started with vLLM to perform:
+本指南将帮助你快速开始使用 vLLM，支持以下场景：
 
-- [Offline batched inference](#offline-batched-inference)
-- [Online serving using OpenAI-compatible server](#openai-compatible-server)
+- [离线批量推理](#offline-batched-inference)
+- [基于 OpenAI 协议的在线服务](#openai-compatible-server)
 
-## Prerequisites
+## 前置条件
 
-- OS: Linux
-- Python: 3.10 -- 3.13
+- 操作系统：Linux
+- Python：3.10 -- 3.13
 
-## Installation
+## 安装指南
 
 === "NVIDIA CUDA"
 
-    If you are using NVIDIA GPUs, you can install vLLM using [pip](https://pypi.org/project/vllm/) directly.
+    如果你使用的是 NVIDIA GPU，可以直接通过 [pip](https://pypi.org/project/vllm/) 安装 vLLM。
 
-    It's recommended to use [uv](https://docs.astral.sh/uv/), a very fast Python environment manager, to create and manage Python environments. Please follow the [documentation](https://docs.astral.sh/uv/#getting-started) to install `uv`. After installing `uv`, you can create a new Python environment and install vLLM using the following commands:
+    推荐使用 [uv](https://docs.astral.sh/uv/)，这是一款高速的 Python 环境管理工具，可以帮助你创建和管理 Python 环境。请参考 [官方文档](https://docs.astral.sh/uv/#getting-started) 完成 `uv` 的安装。安装完成后，可以通过以下命令新建环境并安装 vLLM：
 
     ```bash
     uv venv --python 3.12 --seed
@@ -24,15 +24,15 @@ This guide will help you quickly get started with vLLM to perform:
     uv pip install vllm --torch-backend=auto
     ```
 
-    `uv` can [automatically select the appropriate PyTorch index at runtime](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection) by inspecting the installed CUDA driver version via `--torch-backend=auto` (or `UV_TORCH_BACKEND=auto`). To select a specific backend (e.g., `cu126`), set `--torch-backend=cu126` (or `UV_TORCH_BACKEND=cu126`).
+    `uv` 可以通过 `--torch-backend=auto`（或设置环境变量 `UV_TORCH_BACKEND=auto`）自动检测你的 CUDA 驱动版本，从而自动选择合适的 PyTorch 后端。你也可以指定具体后端（如 `cu126`），只需设置 `--torch-backend=cu126`（或 `UV_TORCH_BACKEND=cu126`）即可。
 
-    Another delightful way is to use `uv run` with `--with [dependency]` option, which allows you to run commands such as `vllm serve` without creating any permanent environment:
+    另外一个便捷方式是使用 `uv run` 搭配 `--with [dependency]`，这样可以直接运行如 `vllm serve` 命令，无需创建持久化环境：
 
     ```bash
     uv run --with vllm vllm --help
     ```
 
-    You can also use [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html) to create and manage Python environments. You can install `uv` to the conda environment through `pip` if you want to manage it within the environment.
+    你也可以通过 [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html) 创建和管理 Python 环境。如果希望在 conda 环境内管理 `uv`，可以用 `pip` 安装：
 
     ```bash
     conda create -n myenv python=3.12 -y
@@ -43,13 +43,13 @@ This guide will help you quickly get started with vLLM to perform:
 
 === "AMD ROCm"
 
-    Use a pre-built docker image from Docker Hub. The public stable image is [rocm/vllm:latest](https://hub.docker.com/r/rocm/vllm). There is also a development image at [rocm/vllm-dev](https://hub.docker.com/r/rocm/vllm-dev).
+    建议直接使用 Docker Hub 上的预构建镜像。稳定版镜像为 [rocm/vllm:latest](https://hub.docker.com/r/rocm/vllm)，开发版镜像为 [rocm/vllm-dev](https://hub.docker.com/r/rocm/vllm-dev)。
     
-    The `-v` flag in the `docker run` command below mounts a local directory into the container. Replace `<path/to/your/models>` with the path on your host machine to the directory containing your models. The models will then be accessible inside the container at `/app/models`.
+    在以下 `docker run` 命令中，`-v` 参数用于将本地目录挂载到容器。请将 `<path/to/your/models>` 替换为主机上存放模型的路径，模型会在容器内映射为 `/app/models`。
     
-    ???+ console "Commands"
+    ???+ console "命令示例"
         ```bash
-        docker pull rocm/vllm-dev:nightly # to get the latest image
+        docker pull rocm/vllm-dev:nightly # 拉取最新镜像
         docker run -it --rm \
         --network=host \
         --group-add=video \
@@ -64,27 +64,27 @@ This guide will help you quickly get started with vLLM to perform:
         ```
 
 !!! note
-    For more detail and non-CUDA platforms, please refer [here](installation/README.md) for specific instructions on how to install vLLM.
+    更多详细信息及非 CUDA 平台的安装方法，请参考[这里](installation/README.md)。
 
-## Offline Batched Inference
+## 离线批量推理
 
-With vLLM installed, you can start generating texts for list of input prompts (i.e. offline batch inferencing). See the example script: [examples/offline_inference/basic/basic.py](../../examples/offline_inference/basic/basic.py)
+安装 vLLM 后，你可以为一组输入 prompt 批量生成文本（即离线推理）。可参考示例脚本：[examples/offline_inference/basic/basic.py](../../examples/offline_inference/basic/basic.py)
 
-The first line of this example imports the classes [LLM][vllm.LLM] and [SamplingParams][vllm.SamplingParams]:
+示例代码的第一行导入了 [LLM][vllm.LLM] 和 [SamplingParams][vllm.SamplingParams]：
 
-- [LLM][vllm.LLM] is the main class for running offline inference with vLLM engine.
-- [SamplingParams][vllm.SamplingParams] specifies the parameters for the sampling process.
+- [LLM][vllm.LLM]：用于运行 vLLM 推理引擎的主类
+- [SamplingParams][vllm.SamplingParams]：用于配置采样过程的参数
 
 ```python
 from vllm import LLM, SamplingParams
 ```
 
-The next section defines a list of input prompts and sampling parameters for text generation. The [sampling temperature](https://arxiv.org/html/2402.05201v1) is set to `0.8` and the [nucleus sampling probability](https://en.wikipedia.org/wiki/Top-p_sampling) is set to `0.95`. You can find more information about the sampling parameters [here](../api/README.md#inference-parameters).
+接下来定义了输入 prompt 列表和文本生成的采样参数。采样温度（sampling temperature）设置为 `0.8`，[核采样概率（nucleus sampling probability）](https://en.wikipedia.org/wiki/Top-p_sampling)设为 `0.95`。关于采样参数的更多信息，请参考[这里](../api/README.md#inference-parameters)。
 
 !!! important
-    By default, vLLM will use sampling parameters recommended by model creator by applying the `generation_config.json` from the Hugging Face model repository if it exists. In most cases, this will provide you with the best results by default if [SamplingParams][vllm.SamplingParams] is not specified.
+    默认情况下，vLLM 会优先使用 Hugging Face 模型仓库中的 `generation_config.json` 来设置推荐的采样参数。如果未指定 [SamplingParams][vllm.SamplingParams]，通常会获得更优的默认推理效果。
 
-    However, if vLLM's default sampling parameters are preferred, please set `generation_config="vllm"` when creating the [LLM][vllm.LLM] instance.
+    如果你希望使用 vLLM 默认采样参数，在创建 [LLM][vllm.LLM] 实例时请设置 `generation_config="vllm"`。
 
 ```python
 prompts = [
@@ -96,20 +96,20 @@ prompts = [
 sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
 ```
 
-The [LLM][vllm.LLM] class initializes vLLM's engine and the [OPT-125M model](https://arxiv.org/abs/2205.01068) for offline inference. The list of supported models can be found [here](../models/supported_models.md).
+[LLM][vllm.LLM] 类会初始化 vLLM 引擎，并加载 [OPT-125M 模型](https://arxiv.org/abs/2205.01068)用于离线推理。支持的模型列表见[这里](../models/supported_models.md)。
 
 ```python
 llm = LLM(model="facebook/opt-125m")
 ```
 
 !!! note
-    By default, vLLM downloads models from [Hugging Face](https://huggingface.co/). If you would like to use models from [ModelScope](https://www.modelscope.cn), set the environment variable `VLLM_USE_MODELSCOPE` before initializing the engine.
+    vLLM 默认从 [Hugging Face](https://huggingface.co/) 下载模型。如果你希望从 [ModelScope](https://www.modelscope.cn) 下载模型，可在初始化前设置环境变量：
 
     ```shell
     export VLLM_USE_MODELSCOPE=True
     ```
 
-Now, the fun part! The outputs are generated using `llm.generate`. It adds the input prompts to the vLLM engine's waiting queue and executes the vLLM engine to generate the outputs with high throughput. The outputs are returned as a list of `RequestOutput` objects, which include all of the output tokens.
+现在进入生成环节！使用 `llm.generate` 进行推理，输入 prompt 会被加入 vLLM 的队列并高效生成输出。输出结果是一个 `RequestOutput` 对象列表，包含所有生成的 token。
 
 ```python
 outputs = llm.generate(prompts, sampling_params)
@@ -121,12 +121,12 @@ for output in outputs:
 ```
 
 !!! note
-    The `llm.generate` method does not automatically apply the model's chat template to the input prompt. Therefore, if you are using an Instruct model or Chat model, you should manually apply the corresponding chat template to ensure the expected behavior. Alternatively, you can use the `llm.chat` method and pass a list of messages which have the same format as those passed to OpenAI's `client.chat.completions`:
+    `llm.generate` 方法不会自动将模型的聊天模板（chat template）应用到输入 prompt。如果你使用的是 Instruct 或 Chat 模型，建议手动应用对应的聊天模板，确保推理效果符合预期。或者你可以使用 `llm.chat` 方法，传入和 OpenAI `client.chat.completions` 相同格式的消息列表：
 
     ??? code
     
         ```python
-        # Using tokenizer to apply chat template
+        # 使用 tokenizer 应用聊天模板
         from transformers import AutoTokenizer
     
         tokenizer = AutoTokenizer.from_pretrained("/path/to/chat_model")
@@ -140,16 +140,16 @@ for output in outputs:
             add_generation_prompt=True,
         )
         
-        # Generate outputs
+        # 生成输出
         outputs = llm.generate(texts, sampling_params)
         
-        # Print the outputs.
+        # 打印结果
         for output in outputs:
             prompt = output.prompt
             generated_text = output.outputs[0].text
             print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
     
-        # Using chat interface.
+        # 使用 chat 接口
         outputs = llm.chat(messages_list, sampling_params)
         for idx, output in enumerate(outputs):
             prompt = prompts[idx]
@@ -157,37 +157,35 @@ for output in outputs:
             print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
         ```
 
-## OpenAI-Compatible Server
+## OpenAI 协议兼容服务
 
-vLLM can be deployed as a server that implements the OpenAI API protocol. This allows vLLM to be used as a drop-in replacement for applications using OpenAI API.
-By default, it starts the server at `http://localhost:8000`. You can specify the address with `--host` and `--port` arguments. The server currently hosts one model at a time and implements endpoints such as [list models](https://platform.openai.com/docs/api-reference/models/list), [create chat completion](https://platform.openai.com/docs/api-reference/chat/completions/create), and [create completion](https://platform.openai.com/docs/api-reference/completions/create) endpoints.
+vLLM 可作为支持 OpenAI API 协议的服务部署。这样你可以直接用 vLLM 替换任何基于 OpenAI API 的应用。服务默认监听 `http://localhost:8000`，可以通过 `--host` 和 `--port` 参数自定义地址。服务当前一次只支持加载一个模型，并实现了如 [模型列表](https://platform.openai.com/docs/api-reference/models/list)、[创建聊天补全](https://platform.openai.com/docs/api-reference/chat/completions/create)、[创建文本补全](https://platform.openai.com/docs/api-reference/completions/create) 等接口。
 
-Run the following command to start the vLLM server with the [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) model:
+以下命令可启动 vLLM 服务，加载 [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) 模型：
 
 ```bash
 vllm serve Qwen/Qwen2.5-1.5B-Instruct
 ```
 
 !!! note
-    By default, the server uses a predefined chat template stored in the tokenizer.
-    You can learn about overriding it [here](../serving/openai_compatible_server.md#chat-template).
+    服务将默认使用 tokenizer 中预设的聊天模板。
+    如何自定义聊天模板，请参考[这里](../serving/openai_compatible_server.md#chat-template)。
 !!! important
-    By default, the server applies `generation_config.json` from the huggingface model repository if it exists. This means the default values of certain sampling parameters can be overridden by those recommended by the model creator.
+    默认情况下，服务会自动应用 huggingface 仓库中的 `generation_config.json`，即采样参数的默认值可能会被模型作者推荐的参数覆盖。
 
-    To disable this behavior, please pass `--generation-config vllm` when launching the server.
+    如需禁用此行为，请在启动服务时增加 `--generation-config vllm` 参数。
 
-This server can be queried in the same format as OpenAI API. For example, to list the models:
+服务的调用格式与 OpenAI API 完全一致。例如查询模型列表：
 
 ```bash
 curl http://localhost:8000/v1/models
 ```
 
-You can pass in the argument `--api-key` or environment variable `VLLM_API_KEY` to enable the server to check for API key in the header.
-You can pass multiple keys after `--api-key`, and the server will accept any of the keys passed, this can be useful for key rotation.
+你可以通过参数 `--api-key` 或环境变量 `VLLM_API_KEY` 启用 API 密钥校验。支持同时配置多个密钥，服务会接受其中任意一个，这对于密钥轮换非常方便。
 
-### OpenAI Completions API with vLLM
+### 使用 vLLM 对接 OpenAI Completions API
 
-Once your server is started, you can query the model with input prompts:
+服务启动后，可以直接用 prompt 查询模型：
 
 ```bash
 curl http://localhost:8000/v1/completions \
@@ -200,14 +198,14 @@ curl http://localhost:8000/v1/completions \
     }'
 ```
 
-Since this server is compatible with OpenAI API, you can use it as a drop-in replacement for any applications using OpenAI API. For example, another way to query the server is via the `openai` Python package:
+由于服务完全兼容 OpenAI API，你可以无缝替换任何用 OpenAI API 的应用。例如，也可以用 `openai` 官方 Python 包进行调用：
 
 ??? code
 
     ```python
     from openai import OpenAI
 
-    # Modify OpenAI's API key and API base to use vLLM's API server.
+    # 修改 OpenAI 的 API key 和地址，指向 vLLM 服务
     openai_api_key = "EMPTY"
     openai_api_base = "http://localhost:8000/v1"
     client = OpenAI(
@@ -221,13 +219,13 @@ Since this server is compatible with OpenAI API, you can use it as a drop-in rep
     print("Completion result:", completion)
     ```
 
-A more detailed client example can be found here: [examples/offline_inference/basic/basic.py](../../examples/offline_inference/basic/basic.py)
+更详细的客户端示例可参考：[examples/offline_inference/basic/basic.py](../../examples/offline_inference/basic/basic.py)
 
-### OpenAI Chat Completions API with vLLM
+### 使用 vLLM 对接 OpenAI Chat Completions API
 
-vLLM is designed to also support the OpenAI Chat Completions API. The chat interface is a more dynamic, interactive way to communicate with the model, allowing back-and-forth exchanges that can be stored in the chat history. This is useful for tasks that require context or more detailed explanations.
+vLLM 也支持 OpenAI 聊天补全 API。聊天接口更适合动态、交互式的对话，可保存聊天历史，非常适合需要上下文或详细解释的场景。
 
-You can use the [create chat completion](https://platform.openai.com/docs/api-reference/chat/completions/create) endpoint to interact with the model:
+你可以通过 [创建聊天补全](https://platform.openai.com/docs/api-reference/chat/completions/create) 接口与模型交互：
 
 ```bash
 curl http://localhost:8000/v1/chat/completions \
@@ -241,13 +239,13 @@ curl http://localhost:8000/v1/chat/completions \
     }'
 ```
 
-Alternatively, you can use the `openai` Python package:
+同样可以用 `openai` Python 包调用：
 
 ??? code
 
     ```python
     from openai import OpenAI
-    # Set OpenAI's API key and API base to use vLLM's API server.
+    # 设置 OpenAI API key 和地址，指向 vLLM 服务
     openai_api_key = "EMPTY"
     openai_api_base = "http://localhost:8000/v1"
 
@@ -266,21 +264,21 @@ Alternatively, you can use the `openai` Python package:
     print("Chat response:", chat_response)
     ```
 
-## On Attention Backends
+## 关于 Attention 后端
 
-Currently, vLLM supports multiple backends for efficient Attention computation across different platforms and accelerator architectures. It automatically selects the most performant backend compatible with your system and model specifications.
+目前，vLLM 支持多种高效 Attention（注意力机制）后端，兼容不同平台和加速器架构。系统会自动为你的环境和模型选择最优的后端。
 
-If desired, you can also manually set the backend of your choice by configuring the environment variable `VLLM_ATTENTION_BACKEND` to one of the following options:
+如需手动指定 Attention 后端，可设置环境变量 `VLLM_ATTENTION_BACKEND`，支持选项如下：
 
-- On NVIDIA CUDA: `FLASH_ATTN`, `FLASHINFER` or `XFORMERS`.
-- On AMD ROCm: `TRITON_ATTN`, `ROCM_ATTN`, `ROCM_AITER_FA` or `ROCM_AITER_UNIFIED_ATTN`.
+- NVIDIA CUDA 下可选：`FLASH_ATTN`、`FLASHINFER` 或 `XFORMERS`
+- AMD ROCm 下可选：`TRITON_ATTN`、`ROCM_ATTN`、`ROCM_AITER_FA` 或 `ROCM_AITER_UNIFIED_ATTN`
 
-For AMD ROCm, you can futher control the specific Attention implementation using the following variables:
+对于 AMD ROCm，还可以通过以下变量更细致地控制 Attention 实现：
 
-- Triton Unified Attention: `VLLM_ROCM_USE_AITER=0 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=0 VLLM_ROCM_USE_AITER_MHA=0`
-- AITER Unified Attention: `VLLM_ROCM_USE_AITER=1 VLLM_USE_AITER_UNIFIED_ATTENTION=1 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=0 VLLM_ROCM_USE_AITER_MHA=0`
-- Triton Prefill-Decode Attention: `VLLM_ROCM_USE_AITER=1 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=1 VLLM_ROCM_USE_AITER_MHA=0`
-- AITER Multi-head Attention: `VLLM_ROCM_USE_AITER=1 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=0 VLLM_ROCM_USE_AITER_MHA=1`
+- Triton 统一 Attention：`VLLM_ROCM_USE_AITER=0 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=0 VLLM_ROCM_USE_AITER_MHA=0`
+- AITER 统一 Attention：`VLLM_ROCM_USE_AITER=1 VLLM_USE_AITER_UNIFIED_ATTENTION=1 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=0 VLLM_ROCM_USE_AITER_MHA=0`
+- Triton Prefill-Decode Attention：`VLLM_ROCM_USE_AITER=1 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=1 VLLM_ROCM_USE_AITER_MHA=0`
+- AITER 多头 Attention：`VLLM_ROCM_USE_AITER=1 VLLM_V1_USE_PREFILL_DECODE_ATTENTION=0 VLLM_ROCM_USE_AITER_MHA=1`
 
 !!! warning
-    There are no pre-built vllm wheels containing Flash Infer, so you must install it in your environment first. Refer to the [Flash Infer official docs](https://docs.flashinfer.ai/) or see [docker/Dockerfile](../../docker/Dockerfile) for instructions on how to install it.
+    目前没有预编译包含 Flash Infer 的 vllm 安装包，请你先在环境中手动安装。安装方法可参考 [Flash Infer 官方文档](https://docs.flashinfer.ai/) 或 [docker/Dockerfile](../../docker/Dockerfile)。

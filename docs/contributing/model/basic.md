@@ -1,28 +1,27 @@
-# Basic Model
+# 基础模型
 
-This guide walks you through the steps to implement a basic vLLM model.
+本指南将带你一步步实现一个基础的 vLLM 模型。
 
-## 1. Bring your model code
+## 1. 引入你的模型代码
 
-First, clone the PyTorch model code from the source repository.
-For instance, vLLM's [OPT model](../../../vllm/model_executor/models/opt.py) was adapted from
-HuggingFace's [modeling_opt.py](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) file.
+首先，从源码仓库克隆你所需的 PyTorch 模型代码。
+比如，vLLM 的 [OPT 模型](../../../vllm/model_executor/models/opt.py) 就是基于 HuggingFace 的 [modeling_opt.py](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) 文件改写的。
 
 !!! warning
-    Make sure to review and adhere to the original code's copyright and licensing terms!
+    请仔细阅读并遵循原始代码的版权及许可协议要求！
 
-## 2. Make your code compatible with vLLM
+## 2. 让你的代码兼容 vLLM
 
-To ensure compatibility with vLLM, your model must meet the following requirements:
+为了确保你的模型能在 vLLM 上正常运行，需要满足以下要求：
 
-### Initialization Code
+### 初始化代码
 
-All vLLM modules within the model must include a `prefix` argument in their constructor. This `prefix` is typically the full name of the module in the model's state dictionary and is crucial for:
+模型中的所有 vLLM 模块构造函数都必须包含一个 `prefix` 参数。这个 `prefix` 通常是模块在模型参数字典中的完整名称，对以下场景非常重要：
 
-- Runtime support: vLLM's attention operators are registered in a model's state by their full names. Each attention operator must have a unique prefix as its layer name to avoid conflicts.
-- Non-uniform quantization support: A quantized checkpoint can selectively quantize certain layers while keeping others in full precision. By providing the `prefix` during initialization, vLLM can match the current layer's `prefix` with the quantization configuration to determine if the layer should be initialized in quantized mode.
+- 运行时支持：vLLM 的注意力算子会根据完整的层名注册到模型参数中。每个注意力算子必须有唯一的前缀，以避免名称冲突。
+- 非均匀量化支持：量化的 checkpoint 可以选择只量化部分层，其余保持全精度。通过在初始化时传入 `prefix`，vLLM 可以根据配置判断当前层是否需要量化。
 
-The initialization code should look like this:
+初始化代码示例：
 
 ??? code
 
@@ -54,9 +53,9 @@ The initialization code should look like this:
             self.model = MyModel(vllm_config, prefix=f"{prefix}.model")
     ```
 
-### Computation Code
+### 计算代码
 
-- Add a `get_input_embeddings` method inside `MyModel` module that returns the text embeddings given `input_ids`. This is equivalent to directly calling the text embedding layer, but provides a unified interface in case `MyModel` is used within a composite multimodal model.
+- 在 `MyModel` 模块内部添加一个 `get_input_embeddings` 方法，用于根据 `input_ids` 返回文本嵌入。这样可以为多模态模型提供一致的接口，相当于直接调用嵌入层。
 
 ```python
 class MyModel(nn.Module):
@@ -66,7 +65,7 @@ class MyModel(nn.Module):
         ... 
 ```
 
-- Rewrite the [forward][torch.nn.Module.forward] method of your model to remove any unnecessary code, such as training-specific code. Modify the input parameters to treat `input_ids` and `positions` as flattened tensors with a single batch size dimension, without a max-sequence length dimension.
+- 重写模型的 [forward][torch.nn.Module.forward] 方法，去掉训练相关的冗余代码。把输入参数改为把 `input_ids` 和 `positions` 视为一维的扁平张量（只有 batch 维度，没有 max-sequence 长度维度）。
 
 ```python
 def forward(
@@ -80,72 +79,69 @@ def forward(
 ```
 
 !!! note
-    Currently, vLLM supports the basic multi-head attention mechanism and its variant with rotary positional embeddings.
-    If your model employs a different attention mechanism, you will need to implement a new attention layer in vLLM.
+    目前，vLLM 支持基础的多头注意力机制及其旋转位置嵌入（rotary positional embedding）变体。
+    如果你的模型使用其他类型的注意力机制，你需要在 vLLM 中自行实现对应的注意力层。
 
-For reference, check out our [Llama implementation](../../../vllm/model_executor/models/llama.py). vLLM already supports a large number of models. It is recommended to find a model similar to yours and adapt it to your model's architecture. Check out [vllm/model_executor/models](../../../vllm/model_executor/models) for more examples.
+参考我们的 [Llama 实现](../../../vllm/model_executor/models/llama.py)。vLLM 已经支持了大量模型，建议找一个与你的模型结构类似的实现，参考并改造。更多示例可见 [vllm/model_executor/models](../../../vllm/model_executor/models)。
 
-## 3. (Optional) Implement tensor parallelism and quantization support
+## 3.（可选）实现张量并行和量化支持
 
-If your model is too large to fit into a single GPU, you can use tensor parallelism to manage it.
-To do this, substitute your model's linear and embedding layers with their tensor-parallel versions.
-For the embedding layer, you can simply replace [torch.nn.Embedding][] with `VocabParallelEmbedding`. For the output LM head, you can use `ParallelLMHead`.
-When it comes to the linear layers, we provide the following options to parallelize them:
+如果你的模型太大，单块 GPU 无法容纳，可以使用张量并行（tensor parallelism）。
+具体做法是将模型中的线性层和嵌入层替换为张量并行版本。
+嵌入层可以直接用 `VocabParallelEmbedding` 替换 [torch.nn.Embedding][]，输出的 LM head 可以用 `ParallelLMHead`。
+线性层则可选用以下方式并行化：
 
-- `ReplicatedLinear`: Replicates the inputs and weights across multiple GPUs. No memory saving.
-- `RowParallelLinear`: The input tensor is partitioned along the hidden dimension. The weight matrix is partitioned along the rows (input dimension). An *all-reduce* operation is performed after the matrix multiplication to reduce the results. Typically used for the second FFN layer and the output linear transformation of the attention layer.
-- `ColumnParallelLinear`: The input tensor is replicated. The weight matrix is partitioned along the columns (output dimension). The result is partitioned along the column dimension. Typically used for the first FFN layer and the separated QKV transformation of the attention layer in the original Transformer.
-- `MergedColumnParallelLinear`: Column-parallel linear that merges multiple `ColumnParallelLinear` operators. Typically used for the first FFN layer with weighted activation functions (e.g., SiLU). This class handles the sharded weight loading logic of multiple weight matrices.
-- `QKVParallelLinear`: Parallel linear layer for the query, key, and value projections of the multi-head and grouped-query attention mechanisms. When number of key/value heads are less than the world size, this class replicates the key/value heads properly. This class handles the weight loading and replication of the weight matrices.
+- `ReplicatedLinear`：输入和权重在多块 GPU 上完全复制，不节省显存。
+- `RowParallelLinear`：输入张量按隐藏维度分块，权重矩阵按行（输入维度）分块，矩阵乘法后通过 all-reduce 合并结果。常用于 FFN 第二层和注意力层的输出线性变换。
+- `ColumnParallelLinear`：输入张量复制，权重矩阵按列（输出维度）分块，输出也按列分块。常用于 FFN 第一层和 Transformer 原始注意力层的 QKV 变换。
+- `MergedColumnParallelLinear`：将多个 `ColumnParallelLinear` 操作合并，常用于带加权激活函数（如 SiLU）的 FFN 第一层。此类会处理多权重矩阵的分布式加载逻辑。
+- `QKVParallelLinear`：用于多头和分组查询注意力机制的 query、key、value 投影。若 key/value 头数少于世界大小，会自动复制 key/value 头。此类负责权重的加载和复制。
 
-Note that all the linear layers above take `linear_method` as an input. vLLM will set this parameter according to different quantization schemes to support weight quantization.
+注意以上所有线性层都需要 `linear_method` 参数，vLLM 会根据不同量化方案设置该参数以支持权重量化。
 
-## 4. Implement the weight loading logic
+## 4. 实现权重加载逻辑
 
-You now need to implement the `load_weights` method in your `*ForCausalLM` class.
-This method should load the weights from the HuggingFace's checkpoint file and assign them to the corresponding layers in your model. Specifically, for `MergedColumnParallelLinear` and `QKVParallelLinear` layers, if the original model has separated weight matrices, you need to load the different parts separately.
+你需要在自己的 `*ForCausalLM` 类中实现 `load_weights` 方法。
+该方法负责从 HuggingFace 的 checkpoint 文件加载权重，并分配到模型的各个层。特别是 `MergedColumnParallelLinear` 和 `QKVParallelLinear` 层，如果原始模型有独立的权重矩阵，需要分别加载不同部分。
 
-## 5. Register your model
+## 5. 注册你的模型
 
-See [this page](registration.md) for instructions on how to register your new model to be used by vLLM.
+如何在 vLLM 内注册模型可参考 [本页面](registration.md)。
 
-## Frequently Asked Questions
+## 常见问题解答
 
-### How to support models with interleaving sliding windows?
+### 如何支持交错滑动窗口（interleaving sliding windows）模型？
 
-For models with interleaving sliding windows (e.g. `google/gemma-2-2b-it` and `mistralai/Ministral-8B-Instruct-2410`), the scheduler will treat the model as a full-attention model, i.e., kv-cache of all tokens will not be dropped. This is to make sure prefix caching works with these models. Sliding window only appears as a parameter to the attention kernel computation.
+对于支持交错滑动窗口的模型（如 `google/gemma-2-2b-it` 和 `mistralai/Ministral-8B-Instruct-2410`），调度器会将其视为全注意力模型，即不会丢弃 kv-cache 中的任何 token。这是为了保证前缀缓存机制正常运行。滑动窗口只作为 attention kernel 的参数出现。
 
-To support a model with interleaving sliding windows, we need to take care of the following details:
+支持此类模型时，需要注意以下细节：
 
-- Make sure the model's `config.json` contains `layer_types`.
-- In the modeling code, parse the correct sliding window value for every layer, and pass it to the attention layer's `per_layer_sliding_window` argument. For reference, check [this line](https://github.com/vllm-project/vllm/blob/996357e4808ca5eab97d4c97c7d25b3073f46aab/vllm/model_executor/models/llama.py#L171).
+- 确保模型的 `config.json` 文件包含 `layer_types`。
+- 在模型代码中，为每一层解析正确的滑动窗口参数，并通过 `per_layer_sliding_window` 参数传递给注意力层。参考 [此代码行](https://github.com/vllm-project/vllm/blob/996357e4808ca5eab97d4c97c7d25b3073f46aab/vllm/model_executor/models/llama.py#L171)。
 
-With these two steps, interleave sliding windows should work with the model.
+这两步完成后，交错滑动窗口机制即可在模型上生效。
 
-### How to support models that use Mamba?
+### 如何支持使用 Mamba 的模型？
 
-We consider 3 different scenarios:
+我们将 Mamba 支持分为三种情况：
 
-1. Models that use Mamba layers (either Mamba-1 or Mamba-2) but do not use attention layers.
-2. Models that combine Mamba layers (either Mamba-1 or Mamba-2) together with attention layers.
-3. Models that combine Mamba-like mechanisms (e.g., Linear Attention, ShortConv) together with attention layers.
+1. 仅包含 Mamba 层（Mamba-1 或 Mamba-2），不包含注意力层的模型。
+2. 同时包含 Mamba 层（Mamba-1 或 Mamba-2）和注意力层的混合模型。
+3. 同时包含类似 Mamba 机制（如 Linear Attention、ShortConv）与注意力层的模型。
 
-For case (1), we recommend looking at the implementation of [`MambaForCausalLM`](../../../vllm/model_executor/models/mamba.py) (for Mamba-1) or [`Mamba2ForCausalLM`](../../../vllm/model_executor/models/mamba2.py) (for Mamba-2) as a reference.
-The model should inherit protocol `IsAttentionFree` and also implement class methods `get_mamba_state_dtype_from_config` and `get_mamba_state_shape_from_config` to calculate the state shapes and data types from the config.
-For the mamba layers themselves, please use the [`MambaMixer`](../../../vllm/model_executor/layers/mamba/mamba_mixer.py) (for Mamba-1) or [`MambaMixer2`](../../../vllm/model_executor/layers/mamba/mamba_mixer2.py) (for Mamba-2) classes.
-Please *do not* use the `MambaCacheManager` (deprecated in V1) or replicate any of the V0-specific code paths in the existing model implementations.
-V0-only classes and code will be removed in the very near future.
-The model should also be added to the `MODELS_CONFIG_MAP` dictionary in [vllm/model_executor/models/config.py](../../../vllm/model_executor/models/config.py) to ensure that the runtime defaults are optimized.
+对于第 (1) 种情况，建议参考 [`MambaForCausalLM`](../../../vllm/model_executor/models/mamba.py)（Mamba-1）或 [`Mamba2ForCausalLM`](../../../vllm/model_executor/models/mamba2.py)（Mamba-2）的实现。
+模型需继承协议 `IsAttentionFree`，并实现类方法 `get_mamba_state_dtype_from_config` 和 `get_mamba_state_shape_from_config`，用于根据配置计算状态形状和数据类型。
+Mamba 层建议使用 [`MambaMixer`](../../../vllm/model_executor/layers/mamba/mamba_mixer.py)（Mamba-1）或 [`MambaMixer2`](../../../vllm/model_executor/layers/mamba/mamba_mixer2.py)（Mamba-2）。
+请不要再使用（已弃用的）`MambaCacheManager`，也不要复制任何 V0 版本特有的代码路径，这些旧代码很快会被移除。
+此外，模型还需加入 [vllm/model_executor/models/config.py](../../../vllm/model_executor/models/config.py) 的 `MODELS_CONFIG_MAP` 字典，以优化运行时默认参数。
 
-For case (2), we recommend using as a reference the implementation of [`JambaForCausalLM`](../../../vllm/model_executor/models/jamba.py) (for an example of a model that uses Mamba-1 and attention together) or [`BambaForCausalLM`](../../../vllm/model_executor/models/bamba.py) (for an example of a model that uses Mamba-2 and attention together).
-These models should follow the same instructions as case (1), but they should inherit protocol `IsHybrid` (instead of `IsAttentionFree`) and it is *not* necessary to add them to the `MODELS_CONFIG_MAP` (their runtime defaults will be inferred from the protocol).
+对于第 (2) 种情况，可以参考 [`JambaForCausalLM`](../../../vllm/model_executor/models/jamba.py)（Mamba-1 + 注意力示例）或 [`BambaForCausalLM`](../../../vllm/model_executor/models/bamba.py)（Mamba-2 + 注意力示例）。
+这些模型实现方式与第 (1) 种类似，但需继承协议 `IsHybrid`（不再用 `IsAttentionFree`），而且不必添加到 `MODELS_CONFIG_MAP`（运行时默认参数会自动推断）。
 
-For case (3), we recommend looking at the implementation of [`MiniMaxText01ForCausalLM`](../../../vllm/model_executor/models/minimax_text_01.py) or [`Lfm2ForCausalLM`](../../../vllm/model_executor/models/lfm2.py) as a reference, which use custom "mamba-like" layers `MiniMaxText01LinearAttention` and `ShortConv` respectively.
-Please follow the same guidelines as case (2) for implementing these models.
-We use "mamba-like" to refer to layers that posses a state that is updated in-place, rather than being appended-to (like KV cache for attention).
-For implementing new custom mamba-like layers, one should inherit from `MambaBase` and implement the methods `get_state_dtype`, `get_state_shape` to calculate the data types and state shapes at runtime, as well as `mamba_type` and `get_attn_backend`.
-It is also necessary to implement the "attention meta-data" class which handles the meta-data that is common across all layers.
-Please see [`LinearAttentionMetadata`](../../../vllm/v1/attention/backends/linear_attn.py) or [`ShortConvAttentionMetadata`](../../../vllm/v1/attention/backends/short_conv_attn.py) for examples of this.
-Finally, if one wants to support torch compile and CUDA graphs, it necessary to wrap the call to the mamba-like layer inside a custom op and register it.
-Please see the calls to `direct_register_custom_op` in [vllm/model_executor/models/minimax_text_01.py](../../../vllm/model_executor/models/minimax_text_01.py) or [vllm/model_executor/layers/mamba/short_conv.py](../../../vllm/model_executor/layers/mamba/short_conv.py) for examples of this.
-The new custom op should then be added to the list `_attention_ops` in [vllm/config/compilation.py](../../../vllm/config/compilation.py) to ensure that piecewise CUDA graphs works as intended.
+对于第 (3) 种情况，可参考 [`MiniMaxText01ForCausalLM`](../../../vllm/model_executor/models/minimax_text_01.py) 或 [`Lfm2ForCausalLM`](../../../vllm/model_executor/models/lfm2.py) 的实现，它们分别使用自定义的 "mamba-like" 层 `MiniMaxText01LinearAttention` 和 `ShortConv`。
+实现方法同第 (2) 种情况。
+"Mamba-like" 指的是那些内部状态会原地更新，而不是像注意力 KV cache 一样追加的层。
+如果你要实现新的自定义 mamba-like 层，应继承 `MambaBase`，并实现 `get_state_dtype` 和 `get_state_shape` 方法（用于运行时计算数据类型和状态形状），以及 `mamba_type` 和 `get_attn_backend`。
+还需实现一个 "attention meta-data" 类，负责管理所有层通用的元数据。参考 [`LinearAttentionMetadata`](../../../vllm/v1/attention/backends/linear_attn.py) 或 [`ShortConvAttentionMetadata`](../../../vllm/v1/attention/backends/short_conv_attn.py)。
+如果你希望支持 torch compile 和 CUDA graphs，需要将对 mamba-like 层的调用包裹在自定义算子内并注册。可参考 [vllm/model_executor/models/minimax_text_01.py](../../../vllm/model_executor/models/minimax_text_01.py) 或 [vllm/model_executor/layers/mamba/short_conv.py](../../../vllm/model_executor/layers/mamba/short_conv.py) 中 `direct_register_custom_op` 的用法。
+最后，新的自定义算子应加入 [vllm/config/compilation.py](../../../vllm/config/compilation.py) 的 `_attention_ops` 列表，以确保分段 CUDA graph 能正常工作。

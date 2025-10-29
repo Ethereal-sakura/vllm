@@ -1,40 +1,37 @@
 # FP8 W8A8
 
-vLLM supports FP8 (8-bit floating point) weight and activation quantization using hardware acceleration on GPUs such as Nvidia H100 and AMD MI300x.
-Currently, only Hopper and Ada Lovelace GPUs are officially supported for W8A8.
-Ampere GPUs are supported for W8A16 (weight-only FP8) utilizing Marlin kernels.
-Quantization of models with FP8 allows for a 2x reduction in model memory requirements and up to a 1.6x improvement in throughput with minimal impact on accuracy.
+vLLM 支持在 Nvidia H100 和 AMD MI300x 等 GPU 上利用硬件加速进行 FP8（8 位浮点数）权重与激活量的量化。当前，W8A8 量化仅官方支持 Hopper 和 Ada Lovelace 架构的 GPU。Ampere 架构则支持 W8A16（仅权重量化 FP8），通过 Marlin 内核实现。采用 FP8 对模型进行量化，可以将模型内存占用减少至一半，并将吞吐量提升最高 1.6 倍，同时对准确性影响极小。
 
-Please visit the HF collection of [quantized FP8 checkpoints of popular LLMs ready to use with vLLM](https://huggingface.co/collections/neuralmagic/fp8-llms-for-vllm-666742ed2b78b7ac8df13127).
+欢迎访问 Hugging Face 上的 [适用于 vLLM 的主流 LLM FP8 量化模型集合](https://huggingface.co/collections/neuralmagic/fp8-llms-for-vllm-666742ed2b78b7ac8df13127)，可直接下载使用。
 
-The FP8 types typically supported in hardware have two distinct representations, each useful in different scenarios:
+硬件支持的 FP8 类型通常有两种不同的表示方法，适用于不同场景：
 
-- **E4M3**: Consists of 1 sign bit, 4 exponent bits, and 3 bits of mantissa. It can store values up to +/-448 and `nan`.
-- **E5M2**: Consists of 1 sign bit, 5 exponent bits, and 2 bits of mantissa. It can store values up to +/-57344, +/- `inf`, and `nan`. The tradeoff for the increased dynamic range is lower precision of the stored values.
+- **E4M3**：由 1 位符号位、4 位指数位和 3 位尾数位组成。可表示数值范围为 +/-448，以及 `nan`。
+- **E5M2**：由 1 位符号位、5 位指数位和 2 位尾数位组成。可表示数值范围为 +/-57344，支持 +/- `inf` 和 `nan`。动态范围变大但精度有所降低。
 
 !!! note
-    FP8 computation is supported on NVIDIA GPUs with compute capability > 8.9 (Ada Lovelace, Hopper).
-    FP8 models will run on compute capability > 8.0 (Ampere) as weight-only W8A16, utilizing FP8 Marlin.
+    FP8 运算仅在 NVIDIA 计算能力大于 8.9 的 GPU（如 Ada Lovelace, Hopper）上支持。
+    FP8 模型在计算能力大于 8.0 的 GPU（Ampere）上以仅权重 W8A16 模式运行，使用 FP8 Marlin。
 
-## Installation
+## 安装
 
-To produce performant FP8 quantized models with vLLM, you'll need to install the [llm-compressor](https://github.com/vllm-project/llm-compressor/) library:
+要在 vLLM 中高效生成 FP8 量化模型，需要先安装 [llm-compressor](https://github.com/vllm-project/llm-compressor/) 库：
 
 ```bash
 pip install llmcompressor
 ```
 
-## Quantization Process
+## 量化流程
 
-The quantization process involves three main steps:
+整个量化流程分为三步：
 
-1. Loading the model
-2. Applying quantization
-3. Evaluating accuracy in vLLM
+1. 加载模型
+2. 执行量化
+3. 在 vLLM 中评估准确率
 
-### 1. Loading the Model
+### 1. 加载模型
 
-Load your model and tokenizer using the standard `transformers` AutoModel classes:
+使用标准的 `transformers` AutoModel 类加载模型和分词器：
 
 ```python
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -48,14 +45,14 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 ```
 
-### 2. Applying Quantization
+### 2. 执行量化
 
-For FP8 quantization, we can recover accuracy with simple RTN quantization. We recommend targeting all `Linear` layers using the `FP8_DYNAMIC` scheme, which uses:
+对于 FP8 量化，可以使用简单的 RTN 量化方法实现高准确率。推荐对所有 `Linear` 层采用 `FP8_DYNAMIC` 方案，该方案包括：
 
-- Static, per-channel quantization on the weights
-- Dynamic, per-token quantization on the activations
+- 权重采用静态、按通道量化
+- 激活量采用动态、按 token 量化
 
-Since simple RTN does not require data for weight quantization and the activations are quantized dynamically, we do not need any calibration data for this quantization flow.
+由于简单的 RTN 权重量化无需数据，激活量在推理时动态量化，因此无需校准数据。
 
 ??? code
 
@@ -63,31 +60,31 @@ Since simple RTN does not require data for weight quantization and the activatio
     from llmcompressor.transformers import oneshot
     from llmcompressor.modifiers.quantization import QuantizationModifier
 
-    # Configure the simple PTQ quantization
+    # 配置简单的 PTQ 量化
     recipe = QuantizationModifier(
         targets="Linear",
         scheme="FP8_DYNAMIC",
         ignore=["lm_head"],
     )
 
-    # Apply the quantization algorithm.
+    # 应用量化算法
     oneshot(model=model, recipe=recipe)
 
-    # Save the model: Meta-Llama-3-8B-Instruct-FP8-Dynamic
+    # 保存模型：Meta-Llama-3-8B-Instruct-FP8-Dynamic
     SAVE_DIR = MODEL_ID.split("/")[1] + "-FP8-Dynamic"
     model.save_pretrained(SAVE_DIR)
     tokenizer.save_pretrained(SAVE_DIR)
     ```
 
-### 3. Evaluating Accuracy
+### 3. 评估准确率
 
-Install `vllm` and `lm-evaluation-harness` for evaluation:
+安装 `vllm` 和 `lm-evaluation-harness` 用于评测：
 
 ```bash
 pip install vllm git+https://github.com/EleutherAI/lm-evaluation-harness.git@206b7722158f58c35b7ffcd53b035fdbdda5126d#egg=lm-eval[api]
 ```
 
-Load and run the model in `vllm`:
+在 `vllm` 中加载并运行模型：
 
 ```python
 from vllm import LLM
@@ -97,10 +94,10 @@ result = llm.generate("Hello my name is")
 print(result[0].outputs[0].text)
 ```
 
-Evaluate accuracy with `lm_eval` (for example on 250 samples of `gsm8k`):
+用 `lm_eval` 评估准确率（例如在 `gsm8k` 任务上抽取 250 个样本）：
 
 !!! note
-    Quantized models can be sensitive to the presence of the `bos` token. `lm_eval` does not add a `bos` token by default, so make sure to include the `add_bos_token=True` argument when running your evaluations.
+    量化模型对 `bos` token 是否存在非常敏感。`lm_eval` 默认不添加 `bos` token，请在评测时务必加上 `add_bos_token=True` 参数。
 
 ```bash
 MODEL=$PWD/Meta-Llama-3-8B-Instruct-FP8-Dynamic
@@ -110,7 +107,7 @@ lm_eval \
   --tasks gsm8k  --num_fewshot 5 --batch_size auto --limit 250
 ```
 
-Here's an example of the resulting scores:
+结果示例：
 
 ```text
 |Tasks|Version|     Filter     |n-shot|  Metric   |   |Value|   |Stderr|
@@ -119,15 +116,15 @@ Here's an example of the resulting scores:
 |     |       |strict-match    |     5|exact_match|↑  |0.768|±  |0.0268|
 ```
 
-## Troubleshooting and Support
+## 常见问题与支持
 
-If you encounter any issues or have feature requests, please open an issue on the [vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor/issues) GitHub repository.
+如遇到问题或有功能需求，请在 [vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor/issues) 的 GitHub 仓库提交 Issue。
 
-## Online Dynamic Quantization
+## 在线动态量化
 
-Dynamic quantization of an original precision BF16/FP16 model to FP8 can be achieved with vLLM without any calibration data required. You can enable the feature by specifying `--quantization="fp8"` in the command line or setting `quantization="fp8"` in the LLM constructor.
+无需校准数据，vLLM 可对原始精度的 BF16/FP16 模型进行在线 FP8 动态量化。只需在命令行中加入 `--quantization="fp8"`，或在 LLM 构造器中设置 `quantization="fp8"` 即可启用。
 
-In this mode, all Linear modules (except for the final `lm_head`) have their weights quantized down to FP8_E4M3 precision with a per-tensor scale. Activations have their minimum and maximum values calculated during each forward pass to provide a dynamic per-tensor scale for high accuracy. As a result, latency improvements are limited in this mode.
+在这种模式下，所有 Linear 层（最终的 `lm_head` 除外）权重会量化到 FP8_E4M3 精度，采用每个张量一个缩放因子。激活量在每次前向计算时动态统计最小/最大值，生成相应缩放因子，实现高准确率。此模式下推理延迟提升有限。
 
 ```python
 from vllm import LLM
@@ -139,4 +136,4 @@ print(result[0].outputs[0].text)
 ```
 
 !!! warning
-    Currently, we load the model at original precision before quantizing down to 8-bits, so you need enough memory to load the whole model.
+    当前模型会先以原始精度加载，再量化到 8 位，因此需要足够内存来加载完整模型。

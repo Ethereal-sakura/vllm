@@ -1,139 +1,52 @@
-# Paged Attention
+# 分页注意力机制（Paged Attention）
 
 !!! warning
-    This is a historical document based on the [original paper for vLLM](https://arxiv.org/abs/2309.06180).
-    It no longer describes the code used in vLLM today.
+    本文档是基于 [vLLM 原始论文](https://arxiv.org/abs/2309.06180) 的历史内容。
+    文中描述的内容已不再适用于当前 vLLM 的代码实现。
 
-Currently, vLLM utilizes its own implementation of a multi-head query
-attention kernel (`csrc/attention/attention_kernels.cu`).
-This kernel is designed to be compatible with
-vLLM's paged KV caches, where the key and value cache are stored in
-separate blocks (note that this block concept differs from the GPU
-thread block. So in a later document, I will refer to vLLM paged
-attention block as "block", while refer to GPU thread block as
-"thread block").
+目前，vLLM 使用了自己的多头查询注意力核函数（multi-head query attention kernel），实现代码在 `csrc/attention/attention_kernels.cu`。
+该核函数专门为 vLLM 的分页 KV 缓存（paged KV caches）设计，其中 key 和 value 缓存分别存储在独立的块中（注意，这里的块和 GPU 的线程块（thread block）不同。所以在后文中，我将 vLLM 的分页注意力块称为“块”，而 GPU 的线程块称为“线程块”）。
 
-To achieve high performance, this kernel relies on a specially
-designed memory layout and access method, specifically when threads
-read data from global memory to shared memory. The purpose of this
-document is to provide a high-level explanation of the kernel
-implementation step by step, aiding those who wish to learn about the
-vLLM multi-head query attention kernel. After going through this
-document, users will likely have a better understanding and feel easier
-to follow the actual implementation.
+为了实现高性能，这个核函数依赖于特别设计的内存布局和访问方式，尤其是在每个线程从全局内存读取数据到共享内存的环节。本文档将一步步为大家解释该核函数的整体实现逻辑，帮助想要深入学习 vLLM 多头查询注意力机制的读者。阅读完本篇内容后，你会对其实现流程有更清晰的理解，也能更容易跟进源码细节。
 
-Please note that this document may not cover all details, such as how
-to calculate the correct index for the corresponding data or the dot
-multiplication implementation. However, after reading this document
-and becoming familiar with the high-level logic flow, it should be
-easier for you to read the actual code and understand the details.
+请注意，本文档不会涵盖所有细节，比如如何计算对应数据的正确索引、点乘实现等。但在掌握了高层逻辑之后，理解实际代码会变得更加轻松。
 
-## Inputs
+## 输入参数
 
-The kernel function takes a list of arguments for the current thread
-to perform its assigned work. The three most important arguments are
-the input pointers `q`, `k_cache`, and `v_cache`, which point
-to query, key, and value data on global memory that need to be read
-and processed. The output pointer `out` points to global memory
-where the result should be written. These four pointers actually
-refer to multi-dimensional arrays, but each thread only accesses the
-portion of data assigned to it. I have omitted all other runtime
-parameters here for simplicity.
+核函数会接收一系列参数，让当前线程能够完成分配到的工作。最重要的三个参数是输入指针 `q`、`k_cache` 和 `v_cache`，分别指向全局内存中的查询（query）、键（key）、值（value）数据，这些数据需要被读取和处理。输出指针 `out` 指向全局内存，用于存储最终结果。这四个指针实际都代表多维数组，但每个线程只会访问自己负责的数据部分。其他运行时参数这里省略，仅做简化。
 
 ```cpp
 template<typename scalar_t, int HEAD_SIZE, int BLOCK_SIZE, int NUM_THREADS, int PARTITION_SIZE = 0>
 __device__ void paged_attention_kernel(
-    ... // Other side args.
+    ... // 其他参数
     const scalar_t* __restrict__ out,       // [num_seqs, num_heads, max_num_partitions, head_size]
     const scalar_t* __restrict__ q,         // [num_seqs, num_heads, head_size]
     const scalar_t* __restrict__ k_cache,   // [num_blocks, num_kv_heads, head_size/x, block_size, x]
     const scalar_t* __restrict__ v_cache,   // [num_blocks, num_kv_heads, head_size, block_size]
-    ... // Other side args.
+    ... // 其他参数
 )
 ```
 
-There are also a list of template arguments above the function
-signature that are determined during compilation time. `scalar_t`
-represents the data type of the query, key, and value data elements,
-such as FP16. `HEAD_SIZE` indicates the number of elements in each
-head. `BLOCK_SIZE` refers to the number of tokens in each block.
-`NUM_THREADS` denotes the number of threads in each thread block.
-`PARTITION_SIZE` represents the number of tensor parallel GPUs (For
-simplicity, we assume this is 0 and tensor parallel is disabled).
+函数签名上方的模板参数会在编译时确定。`scalar_t` 表示查询、键和值数据的元素类型，比如 FP16。`HEAD_SIZE` 是每个头的元素数量。`BLOCK_SIZE` 表示每个块内的 token 数量。`NUM_THREADS` 是每个线程块中的线程数。`PARTITION_SIZE` 代表张量并行的 GPU 数量（为简化起见，这里我们假设为 0，即不启用张量并行）。
 
-With these arguments, we need to perform a sequence of preparations.
-This includes calculating the current head index, block index, and
-other necessary variables. However, for now, we can ignore these
-preparations and proceed directly to the actual calculations. It will
-be easier to understand them once we grasp the entire flow.
+有了这些参数后，需要进行一系列准备工作，比如计算当前头索引、块索引等其它变量。不过这些准备步骤可以先不考虑，等整体流程理解清楚后再回头看会更容易。
 
-## Concepts
+## 重要概念
 
-Just before we dive into the calculation flow, I want to describe a
-few concepts that are needed for later sections. However, you may
-skip this section and return later if you encounter any confusing
-terminologies.
+在正式介绍计算流程前，先补充一些后续章节需要用到的重要术语。如果暂时不明白，后面遇到相关名词时可以回来看。
 
-- **Sequence**: A sequence represents a client request. For example,
-  the data pointed to by `q` has a shape of
-  `[num_seqs, num_heads, head_size]`. That represents there are total
-  `num_seqs` of query sequence data are pointed by `q`. Since this
-  kernel is a single query attention kernel, each sequence only has one
-  query token. Hence, the `num_seqs` equals the total number of tokens
-  that are processed in the batch.
-- **Context**: The context consists of the generated tokens from the
-  sequence. For instance, `["What", "is", "your"]` are the context
-  tokens, and the input query token is `"name"`. The model might
-  generate the token `"?"`.
-- **Vec**: The vec is a list of elements that are fetched and
-  calculated together. For query and key data, the vec size
-  (`VEC_SIZE`) is determined so that each thread group can fetch and
-  calculate 16 bytes of data at a time. For value data, the vec size
-  (`V_VEC_SIZE`) is determined so that each thread can fetch and
-  calculate 16 bytes of data at a time. For example, if the
-  `scalar_t` is FP16 (2 bytes) and `THREAD_GROUP_SIZE` is 2, the
-  `VEC_SIZE` will be 4, while the `V_VEC_SIZE` will be 8.
-- **Thread group**: The thread group is a small group of
-  threads(`THREAD_GROUP_SIZE`) that fetches and calculates one
-  query token and one key token at a time. Each thread handles only a
-  portion of the token data. The total number of elements processed by
-  one thread group is referred as `x`. For example, if the thread
-  group contains 2 threads and the head size is 8, then thread 0
-  handles the query and key elements at index 0, 2, 4, 6, while thread
-  1 handles the elements at index 1, 3, 5, 7.
-- **Block**: The key and value cache data in vLLM are split into
-  blocks. Each block stores data for a fixed number(`BLOCK_SIZE`)
-  of tokens at one head. Each block may contain only a portion of the
-  whole context tokens. For example, if the block size is 16 and the
-  head size is 128, then for one head, one block can store 16 * 128 =
-  2048 elements.
-- **Warp**: A warp is a group of 32 threads(`WARP_SIZE`) that
-  execute simultaneously on a stream multiprocessor (SM). In this
-  kernel, each warp processes the calculation between one query token
-  and key tokens of one entire block at a time (it may process multiple
-  blocks in multiple iterations). For example, if there are 4 warps and
-  6 blocks for one context, the assignment would be like warp 0 handles
-  the 0th, 4th blocks, warp 1 handles the 1st, 5th blocks, warp 2
-  handles the 2nd block and warp 3 handles the 3rd block.
-- **Thread block**: A thread block is a group of
-  threads(`NUM_THREADS`) that can access the same shared memory.
-  Each thread block contains multiple warps(`NUM_WARPS`), and in
-  this kernel, each thread block processes the calculation between one
-  query token and key tokens of a whole context.
-- **Grid**: A grid is a collection of thread blocks and defines the
-  shape of the collection. In this kernel, the shape is
-  `(num_heads, num_seqs, max_num_partitions)`. Therefore, each thread
-  block only handles the calculation for one head, one sequence, and
-  one partition.
+- **序列（Sequence）**：一个序列代表一次客户端请求。比如 `q` 指向的数据形状为 `[num_seqs, num_heads, head_size]`，说明共有 `num_seqs` 个查询序列。由于该核函数是单查询注意力机制，每个序列仅有一个查询 token，因此 `num_seqs` 就是 batch 中处理的 token 总数。
+- **上下文（Context）**：上下文由序列生成的所有 token 组成。例如，`["What", "is", "your"]` 是上下文 token，输入查询 token 为 `"name"`，模型可能生成 `"?"`。
+- **向量（Vec）**：vec 是一组共同读取和计算的元素。对于查询和键数据，vec 的大小（`VEC_SIZE`）按每个线程组能一次读取并计算 16 字节数据来确定。对于值数据，vec 大小（`V_VEC_SIZE`）则按每个线程一次能读取并计算 16 字节来设置。例如，`scalar_t` 若为 FP16（2 字节），`THREAD_GROUP_SIZE` 为 2，则 `VEC_SIZE=4`，`V_VEC_SIZE=8`。
+- **线程组（Thread group）**：线程组是一小组线程（`THREAD_GROUP_SIZE`），每次负责读取和计算一个查询 token 和一个键 token。每个线程只处理该 token 数据的一部分。线程组处理的元素总数称为 `x`。比如线程组有 2 个线程，头大小为 8，则线程 0 处理索引 0、2、4、6 的元素，线程 1 处理索引 1、3、5、7。
+- **块（Block）**：vLLM 的键和值缓存被分割为若干块。每个块存储某个头下固定数量（`BLOCK_SIZE`）的 token 数据。每块可能只包含上下文 tokens 的一部分。例如块大小为 16、头大小为 128，则单个块可存储 16 * 128 = 2048 个元素。
+- **Warp**：一个 warp 是 32 个线程（`WARP_SIZE`）的集合，在同一个流多处理器（SM）上并行执行。在该核函数中，每个 warp 每次处理一个查询 token 和一个块中的所有键 token 的计算（多次迭代可处理多个块）。比如有 4 个 warp、一个上下文有 6 个块，warp 0 处理第 0、4 块，warp 1 处理第 1、5 块，warp 2 处理第 2 块，warp 3 处理第 3 块。
+- **线程块（Thread block）**：线程块是一组线程（`NUM_THREADS`），可访问同一共享内存。每个线程块包含多个 warp（`NUM_WARPS`），本核函数中每个线程块负责一个查询 token 与整个上下文内所有键 token 的计算。
+- **网格（Grid）**：网格是所有线程块的集合，定义了整体的形状。在本核函数中，形状为 `(num_heads, num_seqs, max_num_partitions)`。因此每个线程块只处理一个头、一个序列和一个分区的数据计算。
 
-## Query
+## 查询（Query）
 
-This section will introduce how query data is stored in memory and
-fetched by each thread. As mentioned above, each thread group fetches
-one query token data, while each thread itself only handles a part of
-one query token data. Within each warp, every thread group will fetch
-the same query token data, but will multiply it with different key
-token data.
+本节介绍查询数据在内存中的存储方式以及每个线程如何读取。前文提到，每个线程组会读取一个查询 token 的数据，而每个线程只处理该 token 的一部分。在同一个 warp 内，每个线程组都会读取同一个查询 token 的数据，但会与不同的键 token 数据做点乘。
 
 ```cpp
 const scalar_t* q_ptr = q + seq_idx * q_stride + head_idx * HEAD_SIZE;
@@ -143,10 +56,7 @@ const scalar_t* q_ptr = q + seq_idx * q_stride + head_idx * HEAD_SIZE;
   ![](../assets/design/paged_attention/query.png){ align="center" alt="query" width="70%" }
 </figure>
 
-Each thread defines its own `q_ptr` which points to the assigned
-query token data on global memory. For example, if `VEC_SIZE` is 4
-and `HEAD_SIZE` is 128, the `q_ptr` points to data that contains
-total of 128 elements divided into 128 / 4 = 32 vecs.
+每个线程会定义自己的 `q_ptr`，指向全局内存中分配到的查询 token 数据。例如 `VEC_SIZE=4`、`HEAD_SIZE=128` 时，`q_ptr` 指向的这段数据包含 128 个元素，被分为 128 / 4 = 32 个 vec。
 
 <figure markdown="span">
   ![](../assets/design/paged_attention/q_vecs.png){ align="center" alt="q_vecs" width="70%" }
@@ -156,25 +66,11 @@ total of 128 elements divided into 128 / 4 = 32 vecs.
 __shared__ Q_vec q_vecs[THREAD_GROUP_SIZE][NUM_VECS_PER_THREAD];
 ```
 
-Next, we need to read the global memory data pointed to by `q_ptr`
-into shared memory as `q_vecs`. It is important to note that each
-vecs is assigned to a different row. For example, if the
-`THREAD_GROUP_SIZE` is 2, thread 0 will handle the 0th row vecs,
-while thread 1 handles the 1st row vecs. By reading the query data in
-this way, neighboring threads like thread 0 and thread 1 can read
-neighbor memory, achieving the memory coalescing to improve
-performance.
+接下来，需将 `q_ptr` 指向的全局内存数据读取到共享内存 `q_vecs`。要注意的是，每个 vec 分配到不同行。例如，`THREAD_GROUP_SIZE=2` 时，线程 0 负责第 0 行 vec，线程 1 负责第 1 行 vec。这样读取查询数据可以让相邻线程（如线程 0 和线程 1）访问相邻内存，实现内存合并（memory coalescing），提升性能。
 
-## Key
+## 键（Key）
 
-Similar to the "Query" section, this section introduces memory layout
-and assignment for keys. While each thread group only handle one
-query token one kernel run, it may handle multiple key tokens across
-multiple iterations. Meanwhile, each warp will process multiple blocks
-of key tokens in multiple iterations, ensuring that all context
-tokens are processed by the entire thread group after the kernel run.
-In this context, "handle" refers to performing the dot multiplication
-between query data and key data.
+与“查询”类似，本节介绍键数据的内存布局及分配方式。每个线程组每次只处理一个查询 token，但可以在多次迭代中处理多个键 token。每个 warp 会通过多次迭代处理多个块，确保所有上下文 token 都被处理一次。在这里，“处理”指的是查询与键数据的点乘计算。
 
 ```cpp
 const scalar_t* k_ptr = k_cache + physical_block_number * kv_block_stride
@@ -182,25 +78,13 @@ const scalar_t* k_ptr = k_cache + physical_block_number * kv_block_stride
                     + physical_block_offset * x;
 ```
 
-Unlike to `q_ptr`, `k_ptr` in each thread will point to different
-key token at different iterations. As shown above, that `k_ptr`
-points to key token data based on `k_cache` at assigned block,
-assigned head and assigned token.
+与 `q_ptr` 不同，每个线程的 `k_ptr` 会在不同迭代中指向不同的键 token。上述代码说明，`k_ptr` 会根据分配的块、头、token 在 `k_cache` 上定位键 token 数据。
 
 <figure markdown="span">
   ![](../assets/design/paged_attention/key.png){ align="center" alt="key" width="70%" }
 </figure>
 
-The diagram above illustrates the memory layout for key data. It
-assumes that the `BLOCK_SIZE` is 16, `HEAD_SIZE` is 128, `x` is
-8, `THREAD_GROUP_SIZE` is 2, and there are a total of 4 warps. Each
-rectangle represents all the elements for one key token at one head,
-which will be processed by one thread group. The left half shows the
-total 16 blocks of key token data for warp 0, while the right half
-represents the remaining key token data for other warps or
-iterations. Inside each rectangle, there are a total 32 vecs (128
-elements for one token) that will be processed by 2 threads (one
-thread group) separately.
+上图展示了键数据的内存布局。假设 `BLOCK_SIZE=16`、`HEAD_SIZE=128`、`x=8`、`THREAD_GROUP_SIZE=2`，且共有 4 个 warp。每个矩形代表一个头下某个键 token 的全部元素，由一个线程组处理。左半部分展示了 warp 0 负责的 16 块键 token 数据，右半部分是其它 warp 或迭代处理的剩余数据。每个矩形内有 32 个 vec（每 token 128 个元素），由 2 个线程分别处理。
 
 <figure markdown="span">
   ![](../assets/design/paged_attention/k_vecs.png){ align="center" alt="k_vecs" width="70%" }
@@ -210,31 +94,13 @@ thread group) separately.
 K_vec k_vecs[NUM_VECS_PER_THREAD]
 ```
 
-Next, we need to read the key token data from `k_ptr` and store
-them on register memory as `k_vecs`. We use register memory for
-`k_vecs` because it will only be accessed by one thread once,
-whereas `q_vecs` will be accessed by multiple threads multiple
-times. Each `k_vecs` will contain multiple vectors for later
-calculation. Each vec will be set at each inner iteration. The
-assignment of vecs allows neighboring threads in a warp to read
-neighboring memory together, which again promotes the memory
-coalescing. For instance, thread 0 will read vec 0, while thread 1
-will read vec 1. In the next inner loop, thread 0 will read vec 2,
-while thread 1 will read vec 3, and so on.
+接下来，需要把 `k_ptr` 指向的键 token 数据读取到寄存器 `k_vecs`。这里使用寄存器是因为 `k_vecs` 只会被单个线程访问一次，而 `q_vecs` 可能被多个线程反复访问。每个 `k_vecs` 会存储多个后续计算用的向量，每次内层迭代设置一个 vec。vec 的分配方式可以让 warp 中相邻线程一起读取相邻内存，同样实现内存合并。例如线程 0 读取 vec 0，线程 1 读取 vec 1，下一次内层循环分别读取 vec 2、vec 3，以此类推。
 
-You may still be a little confused about the overall flow. Don't
-worry, please keep reading the next "QK" section. It will illustrate
-the query and key calculation flow in a clearer and higher-level
-manner.
+如果对整体流程还不太清楚，不必担心，继续阅读下方 “QK” 部分，会以更高层、更直观的方式说明查询与键的计算流程。
 
 ## QK
 
-As shown the pseudo code below, before the entire for loop block, we
-fetch the query data for one token and store it in `q_vecs`. Then,
-in the outer for loop, we iterate through different `k_ptrs` that
-point to different tokens and prepare the `k_vecs` in the inner for
-loop. Finally, we perform the dot multiplication between the
-`q_vecs` and each `k_vecs`.
+如下伪代码所示，在整个外层循环前，先读取一个查询 token 的数据到 `q_vecs`。然后在外层循环中，遍历不同的 `k_ptr`，分别指向不同的键 token，并在内层循环准备 `k_vecs`。最后，将 `q_vecs` 与 `k_vecs` 做点乘。
 
 ```cpp
 q_vecs = ...
@@ -248,30 +114,13 @@ for ... {
 }
 ```
 
-As mentioned before, for each thread, it only fetches part of the
-query and key token data at a time. However, there will be a cross
-thread group reduction happen in the `Qk_dot<>::dot` . So `qk`
-returned here is not just between part of the query and key token dot
-multiplication, but actually a full result between entire query and
-key token data.
+如前所述，每个线程每次只读取部分查询和键 token 数据。不过在 `Qk_dot<>::dot` 中会跨线程组做归约，因此这里返回的 `qk` 并不是部分数据的点乘结果，而是整个查询与键 token 的完整点乘结果。
 
-For example, if the value of `HEAD_SIZE` is 128 and
-`THREAD_GROUP_SIZE` is 2, each thread's `k_vecs` will contain
-total 64 elements. However, the returned `qk` is actually the
-result of dot multiplication between 128 query elements and 128 key
-elements. If you want to learn more about the details of the dot
-multiplication and reduction, you may refer to the implementation of
-`Qk_dot<>::dot`. However, for the sake of simplicity, I will not
-cover it in this document.
+举例来说，`HEAD_SIZE=128`、`THREAD_GROUP_SIZE=2` 时，每个线程的 `k_vecs` 包含 64 个元素。但最终返回的 `qk` 是 128 个查询元素与 128 个键元素的点乘结果。如果想了解具体点乘和归约的细节，可以参考 `Qk_dot<>::dot` 的实现，本文不再展开。
 
 ## Softmax
 
-Next, we need to calculate the normalized softmax for all `qk`s,
-as shown above, where each $x$ represents a `qk`. To do this,
-we must obtain the reduced value of `qk_max`($m(x)$) and
-the `exp_sum`($\ell(x)$) of all `qk`s. The reduction
-should be performed across the entire thread block, encompassing
-results between the query token and all context key tokens.
+接下来需对所有 `qk` 计算归一化的 softmax，如上图所示，每个 $x$ 代表一个 `qk`。这一步需要获得所有 `qk` 的最大值 `qk_max`（$m(x)$）和指数和 `exp_sum`（$\ell(x)$）。归约操作需要在整个线程块范围内完成，包含查询 token 与所有上下文键 token 的结果。
 
 $$
 \begin{gather*}
@@ -280,13 +129,9 @@ m(x):=\max _i \quad x_i \\ \quad f(x):=\left[\begin{array}{lll}e^{x_1-m(x)} & \l
 \end{gather*}
 $$
 
-### `qk_max` and `logits`
+### `qk_max` 和 `logits`
 
-Just right after we get the `qk` result, we can set the temporary
-`logits` result with `qk` (In the end, the `logits` should
-store the normalized softmax result). Also we can compare and collect
-the `qk_max` for all `qk`s that are calculated by current
-thread group.
+刚拿到 `qk` 结果后，可以把临时的 `logits` 设置为 `qk`（最终 `logits` 会存储归一化 softmax 结果）。同时可以比较并收集当前线程组计算出的所有 `qk` 的最大值 `qk_max`。
 
 ```cpp
 if (thread_group_offset == 0) {
@@ -296,9 +141,7 @@ if (thread_group_offset == 0) {
 }
 ```
 
-Please note that the `logits` here is on shared memory, so each
-thread group will set the fields for its own assigned context tokens.
-Overall, the size of logits should be number of context tokens.
+请注意，`logits` 存储在共享内存，每个线程组会为分配到的上下文 token 设置对应字段。整体而言，logits 的大小等于上下文 token 数量。
 
 ```cpp
 for (int mask = WARP_SIZE / 2; mask >= THREAD_GROUP_SIZE; mask /= 2) {
@@ -310,9 +153,7 @@ if (lane == 0) {
 }
 ```
 
-Then we need to get the reduced `qk_max` across each warp. The main
-idea is to make threads in warp to communicate with each other and
-get the final max `qk` .
+随后，要在每个 warp 内归约 `qk_max`。主要通过 warp 内线程互相通信，得到最终的最大 `qk`。
 
 ```cpp
 for (int mask = NUM_WARPS / 2; mask >= 1; mask /= 2) {
@@ -321,14 +162,11 @@ for (int mask = NUM_WARPS / 2; mask >= 1; mask /= 2) {
 qk_max = VLLM_SHFL_SYNC(qk_max, 0);
 ```
 
-Finally, we can get the reduced `qk_max` from whole thread block by
-compare the `qk_max` from all warps in this thread block. Then we
-need to broadcast the final result to each thread.
+最后，将每个线程块所有 warp 的 `qk_max` 进行归约，得到整个线程块的最大值，并广播给每个线程。
 
 ### `exp_sum`
 
-Similar to `qk_max`, we need to get the reduced sum value from the
-entire thread block too.
+同样地，exp_sum 也需要在整个线程块范围内归约。
 
 ```cpp
 for (int i = thread_idx; i < num_tokens; i += NUM_THREADS) {
@@ -340,11 +178,7 @@ for (int i = thread_idx; i < num_tokens; i += NUM_THREADS) {
 exp_sum = block_sum<NUM_WARPS>(&red_smem[NUM_WARPS], exp_sum);
 ```
 
-Firstly, sum all exp values from each thread group, and meanwhile,
-convert each entry of `logits` from `qk` to `exp(qk - qk_max)`.
-Please note, the `qk_max` here is already the max `qk` across the
-whole thread block. And then we can do reduction for `exp_sum`
-across whole thread block just like the `qk_max`.
+首先，对每个线程组的 exp 值求和，同时将 `logits` 从 `qk` 转化为 `exp(qk - qk_max)`。注意，这里的 `qk_max` 已是整个线程块的最大值。之后，对 `exp_sum` 做线程块级归约，和 `qk_max` 的归约方式相同。
 
 ```cpp
 const float inv_sum = __fdividef(1.f, exp_sum + 1e-6f);
@@ -353,13 +187,9 @@ for (int i = thread_idx; i < num_tokens; i += NUM_THREADS) {
 }
 ```
 
-Finally, with the reduced `qk_max` and `exp_sum`, we can obtain
-the final normalized softmax result as `logits`. This `logits`
-variable will be used for dot multiplication with the value data in
-later steps. Now, it should store the normalized softmax result of
-`qk` for all assigned context tokens.
+最终，使用归约得到的 `qk_max` 和 `exp_sum`，可以得到归一化 softmax 结果并存入 `logits`。后续会用该变量与值数据做点乘。此时，`logits` 已存储了所有分配到的上下文 token 的归一化 `qk` softmax 结果。
 
-## Value
+## 值（Value）
 
 <figure markdown="span">
   ![](../assets/design/paged_attention/value.png){ align="center" alt="value" width="70%" }
@@ -373,140 +203,6 @@ later steps. Now, it should store the normalized softmax result of
   ![](../assets/design/paged_attention/v_vec.png){ align="center" alt="v_vec" width="70%" }
 </figure>
 
-Now we need to retrieve the value data and perform dot multiplication
-with `logits`. Unlike query and key, there is no thread group
-concept for value data. As shown in diagram, different from key token
-memory layout, elements from the same column correspond to the same
-value token. For one block of value data, there are `HEAD_SIZE` of
-rows and `BLOCK_SIZE` of columns that are split into multiple
-`v_vecs`.
+现在需要取出值数据，与 logits 做点乘。不同于查询和键，值数据没有线程组的概念。上图所示，值 token 的内存布局和键 token 不同，同一列的元素属于同一个值 token。对于单个值块（block），有 `HEAD_SIZE` 行和 `BLOCK_SIZE` 列，被分割成多个 `v_vecs`。
 
-Each thread always fetches `V_VEC_SIZE` elements from the same
-`V_VEC_SIZE` of tokens at a time. As a result, a single thread
-retrieves multiple `v_vec`s from different rows and the same
-columns through multiple inner iterations. For each `v_vec`, it
-needs to be dot multiplied with the corresponding `logits_vec`,
-which is also `V_VEC_SIZE` elements from `logits`. Overall, with
-multiple inner iterations, each warp will process one block of value
-tokens. And with multiple outer iterations, the whole context value
-tokens are processed
-
-```cpp
-float accs[NUM_ROWS_PER_THREAD];
-for ... { // Iteration over different blocks.
-    logits_vec = ...
-    for ... { // Iteration over different rows.
-        v_vec = ...
-        ...
-        accs[i] += dot(logits_vec, v_vec);
-    }
-}
-```
-
-As shown in the above pseudo code, in the outer loop, similar to
-`k_ptr`, `logits_vec` iterates over different blocks and reads
-`V_VEC_SIZE` elements from `logits`. In the inner loop, each
-thread reads `V_VEC_SIZE` elements from the same tokens as a
-`v_vec` and performs dot multiplication. It is important to note
-that in each inner iteration, the thread fetches different head
-position elements for the same tokens. The dot result is then
-accumulated in `accs`. Therefore, each entry of `accs` is mapped
-to a head position assigned to the current thread.
-
-For example, if `BLOCK_SIZE` is 16 and `V_VEC_SIZE` is 8, each
-thread fetches 8 value elements for 8 tokens at a time. Each element
-is from different tokens at the same head position. If `HEAD_SIZE`
-is 128 and `WARP_SIZE` is 32, for each inner loop, a warp needs to
-fetch `WARP_SIZE * V_VEC_SIZE = 256` elements. This means there are
-a total of 128 * 16 / 256 = 8 inner iterations for a warp to handle
-a whole block of value tokens. And each `accs` in each thread
-contains 8 elements that accumulated at 8 different head positions.
-For the thread 0, the `accs` variable will have 8 elements, which
-are 0th, 32nd … 224th elements of a value head that are accumulated
-from all assigned 8 tokens.
-
-## LV
-
-Now, we need to perform reduction for `accs` within each warp. This
-process allows each thread to accumulate the `accs` for the
-assigned head positions of all tokens in one block.
-
-```cpp
-for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
-    float acc = accs[i];
-    for (int mask = NUM_V_VECS_PER_ROW / 2; mask >= 1; mask /= 2) {
-        acc += VLLM_SHFL_XOR_SYNC(acc, mask);
-    }
-    accs[i] = acc;
-}
-```
-
-Next, we perform reduction for `accs` across all warps, allowing
-each thread to have the accumulation of `accs` for the assigned
-head positions of all context tokens. Please note that each `accs`
-in every thread only stores the accumulation for a portion of
-elements of the entire head for all context tokens. However, overall,
-all results for output have been calculated but are just stored in
-different thread register memory.
-
-??? code
-
-    ```cpp
-    float* out_smem = reinterpret_cast<float*>(shared_mem);
-    for (int i = NUM_WARPS; i > 1; i /= 2) {
-        // Upper warps write to shared memory.
-        ...
-        float* dst = &out_smem[(warp_idx - mid) * HEAD_SIZE];
-        for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
-            ...
-            dst[row_idx] = accs[i];
-        }
-
-        // Lower warps update the output.
-        const float* src = &out_smem[warp_idx * HEAD_SIZE];
-        for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
-            ...
-            accs[i] += src[row_idx];
-        }
-
-        // Write out the accs.
-    }
-    ```
-
-## Output
-
-Now we can write all of calculated result from local register memory
-to final output global memory.
-
-```cpp
-scalar_t* out_ptr = out + seq_idx * num_heads * max_num_partitions * HEAD_SIZE
-                + head_idx * max_num_partitions * HEAD_SIZE
-                + partition_idx * HEAD_SIZE;
-```
-
-First, we need to define the `out_ptr` variable, which points to
-the start address of the assigned sequence and assigned head.
-
-```cpp
-for (int i = 0; i < NUM_ROWS_PER_THREAD; i++) {
-    const int row_idx = lane / NUM_V_VECS_PER_ROW + i * NUM_ROWS_PER_ITER;
-    if (row_idx < HEAD_SIZE && lane % NUM_V_VECS_PER_ROW == 0) {
-        from_float(*(out_ptr + row_idx), accs[i]);
-    }
-}
-```
-
-Finally, we need to iterate over different assigned head positions
-and write out the corresponding accumulated result based on the
-`out_ptr`.
-
-## Citation
-
-```bibtex
-@inproceedings{kwon2023efficient,
-  title={Efficient Memory Management for Large Language Model Serving with PagedAttention},
-  author={Woosuk Kwon and Zhuohan Li and Siyuan Zhuang and Ying Sheng and Lianmin Zheng and Cody Hao Yu and Joseph E. Gonzalez and Hao Zhang and Ion Stoica},
-  booktitle={Proceedings of the ACM SIGOPS 29th Symposium on Operating Systems Principles},
-  year={2023}
-}
-```
+每个线程每次都从同一组 token 中读取 `V_VEC_SIZE` 个元素。因此

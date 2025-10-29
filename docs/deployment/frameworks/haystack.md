@@ -1,26 +1,26 @@
 # Haystack
 
-[Haystack](https://github.com/deepset-ai/haystack) is an end-to-end LLM framework that allows you to build applications powered by LLMs, Transformer models, vector search and more. Whether you want to perform retrieval-augmented generation (RAG), document search, question answering or answer generation, Haystack can orchestrate state-of-the-art embedding models and LLMs into pipelines to build end-to-end NLP applications and solve your use case.
+[Haystack](https://github.com/deepset-ai/haystack) 是一个端到端的大语言模型（LLM）框架，可以帮助你构建由 LLM、Transformer 模型、向量检索等技术驱动的应用。不论你想实现检索增强生成（RAG）、文档搜索、问答还是答案生成，Haystack 都能将最先进的嵌入模型和 LLM 通过流水线（pipeline）组合起来，打造完整的自然语言处理（NLP）应用，满足你的实际需求。
 
-It allows you to deploy a large language model (LLM) server with vLLM as the backend, which exposes OpenAI-compatible endpoints.
+它支持部署以 vLLM 作为后端的大语言模型服务器，并提供与 OpenAI 兼容的接口。
 
-## Prerequisites
+## 前置条件
 
-Set up the vLLM and Haystack environment:
+请先搭建好 vLLM 和 Haystack 的运行环境：
 
 ```bash
 pip install vllm haystack-ai
 ```
 
-## Deploy
+## 部署
 
-1. Start the vLLM server with the supported chat completion model, e.g.
+1. 启动支持对话生成的 vLLM 服务器，例如：
 
     ```bash
     vllm serve mistralai/Mistral-7B-Instruct-v0.1
     ```
 
-1. Use the `OpenAIGenerator` and `OpenAIChatGenerator` components in Haystack to query the vLLM server.
+2. 在 Haystack 中使用 `OpenAIGenerator` 和 `OpenAIChatGenerator` 组件来访问 vLLM 服务器。
 
 ??? code
 
@@ -30,7 +30,7 @@ pip install vllm haystack-ai
     from haystack.utils import Secret
 
     generator = OpenAIChatGenerator(
-        # for compatibility with the OpenAI API, a placeholder api_key is needed
+        # 为了兼容 OpenAI API，这里需要一个占位的 api_key
         api_key=Secret.from_token("VLLM-PLACEHOLDER-API-KEY"),
         model="mistralai/Mistral-7B-Instruct-v0.1",
         api_base_url="http://{your-vLLM-host-ip}:{your-vLLM-host-port}/v1",
@@ -52,4 +52,4 @@ pip install vllm haystack-ai
 ------------------------------
 ```
 
-For details, see the tutorial [Using vLLM in Haystack](https://github.com/deepset-ai/haystack-integrations/blob/main/integrations/vllm.md).
+更多细节可以参考教程 [在 Haystack 中使用 vLLM](https://github.com/deepset-ai/haystack-integrations/blob/main/integrations/vllm.md)

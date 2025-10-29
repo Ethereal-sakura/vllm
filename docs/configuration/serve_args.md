@@ -1,18 +1,18 @@
 # Server Arguments
 
-The `vllm serve` command is used to launch the OpenAI-compatible server.
+`vllm serve` 命令用于启动兼容 OpenAI 的服务端。
 
-## CLI Arguments
+## 命令行参数
 
-The `vllm serve` command is used to launch the OpenAI-compatible server.
-To see the available options, take a look at the [CLI Reference](../cli/README.md#options)!
+`vllm serve` 命令用于启动兼容 OpenAI 的服务端。
+想要查看可用选项，请参考 [命令行参考](../cli/README.md#options)！
 
-## Configuration file
+## 配置文件
 
-You can load CLI arguments via a [YAML](https://yaml.org/) config file.
-The argument names must be the long form of those outlined [above](serve_args.md).
+你可以通过 [YAML](https://yaml.org/) 配置文件加载命令行参数。
+参数名必须使用上面提到的长格式名称（详见 [上文](serve_args.md)）。
 
-For example:
+例如：
 
 ```yaml
 # config.yaml
@@ -23,13 +23,13 @@ port: 6379
 uvicorn-log-level: "info"
 ```
 
-To use the above config file:
+要使用上面的配置文件：
 
 ```bash
 vllm serve --config config.yaml
 ```
 
 !!! note
-    In case an argument is supplied simultaneously using command line and the config file, the value from the command line will take precedence.
-    The order of priorities is `command line > config file values > defaults`.
-    e.g. `vllm serve SOME_MODEL --config config.yaml`, SOME_MODEL takes precedence over `model` in config file.
+    如果某个参数同时在命令行和配置文件中提供，则命令行中的值优先。
+    参数优先级顺序为：`命令行 > 配置文件 > 默认值`。
+    例如：`vllm serve SOME_MODEL --config config.yaml`，此时 SOME_MODEL 优先于配置文件中的 `model`。

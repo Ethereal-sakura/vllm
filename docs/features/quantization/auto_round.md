@@ -1,39 +1,36 @@
 # AutoRound
 
-[AutoRound](https://github.com/intel/auto-round) is Intel’s advanced quantization algorithm designed to produce highly efficient **INT2, INT3, INT4, and INT8**
-quantized large language models—striking an optimal balance between accuracy and deployment performance.
+[AutoRound](https://github.com/intel/auto-round) 是英特尔推出的先进量化算法，能够高效地对大语言模型进行 **INT2、INT3、INT4 和 INT8** 量化，在模型精度和部署性能之间实现了最佳平衡。
 
-AutoRound applies weight-only quantization to transformer-based models, enabling significant memory savings and faster
-inference while maintaining near-original accuracy. It supports a wide range of hardware platforms, including **CPUs,
-Intel GPUs, HPUs, and CUDA-enabled devices**.
+AutoRound 采用权重量化（weight-only quantization）技术，面向 Transformer 架构模型，不仅大幅节省内存，还能加快推理速度，同时保持接近原始模型的准确率。它支持多种硬件平台，包括 **CPU、英特尔 GPU、HPU 以及支持 CUDA 的设备**。
 
-Please refer to the [AutoRound guide](https://github.com/intel/auto-round/blob/main/docs/step_by_step.md) for more details.
+详细内容请参考 [AutoRound 指南](https://github.com/intel/auto-round/blob/main/docs/step_by_step.md) 
 
-Key Features:
+主要特性：
 
-✅ **AutoRound, AutoAWQ, AutoGPTQ, and GGUF** are supported
+✅ 支持 **AutoRound、AutoAWQ、AutoGPTQ 和 GGUF**
 
-✅ **10+ vision-language models (VLMs)** are supported
+✅ 支持 **10+ 种视觉-语言模型（VLMs）**
 
-✅ **Per-layer mixed-bit quantization** for fine-grained control
+✅ 支持 **逐层混合比特量化**，实现更精细的控制
 
-✅ **RTN (Round-To-Nearest) mode** for quick quantization with slight accuracy loss
+✅ 提供 **RTN（Round-To-Nearest）模式**，可快速量化，仅带来微小精度损失
 
-✅ **Multiple quantization recipes**: best, base, and light
+✅ 多种量化策略选择：best、base 和 light
 
-✅ Advanced utilities such as immediate packing and support for **10+ backends**
+✅ 提供高级工具，如即时打包，并支持 **10+ 种后端**
 
-## Installation
+## 安装方式
 
 ```bash
 uv pip install auto-round
 ```
 
-## Quantizing a model
+## 对模型进行量化
 
-For VLMs, please change to `auto-round-mllm` in CLI usage and `AutoRoundMLLM` in API usage.
+如需量化视觉-语言模型（VLMs），命令行中请将 `auto-round` 替换为 `auto-round-mllm`，API 调用中使用 `AutoRoundMLLM`。
 
-### CLI usage
+### 命令行用法
 
 ```bash
 auto-round \
@@ -51,7 +48,7 @@ auto-round \
     --output_dir ./tmp_autoround
 ```
 
-### API usage
+### API 用法
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -64,20 +61,20 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 bits, group_size, sym = 4, 128, True
 autoround = AutoRound(model, tokenizer, bits=bits, group_size=group_size, sym=sym)
 
-# the best accuracy, 4-5X slower, low_gpu_mem_usage could save ~20G but ~30% slower
+# 最高精度，速度会慢 4-5 倍，low_gpu_mem_usage 可节省约 20G 显存，但速度会下降约 30%
 # autoround = AutoRound(model, tokenizer, nsamples=512, iters=1000, low_gpu_mem_usage=True, bits=bits, group_size=group_size, sym=sym)
 
-# 2-3X speedup, slight accuracy drop at W4G128
+# 速度提升 2-3 倍，W4G128 配置下精度略有下降
 # autoround = AutoRound(model, tokenizer, nsamples=128, iters=50, lr=5e-3, bits=bits, group_size=group_size, sym=sym )
 
 output_dir = "./tmp_autoround"
-# format= 'auto_round'(default), 'auto_gptq', 'auto_awq'
+# format 可选：'auto_round'(默认)、'auto_gptq'、'auto_awq'
 autoround.quantize_and_save(output_dir, format="auto_round")
 ```
 
-## Running a quantized model with vLLM
+## 使用 vLLM 运行量化后的模型
 
-Here is some example code to run auto-round format in vLLM:
+以下是使用 vLLM 加载 auto-round 格式模型的示例代码：
 
 ```python
 from vllm import LLM, SamplingParams
@@ -97,7 +94,6 @@ for output in outputs:
     print(f"Prompt: {prompt!r}, Generated text: {generated_text!r}")
 ```
 
-## Acknowledgement
+## 致谢
 
-Special thanks to open-source low precision libraries such as AutoGPTQ, AutoAWQ, GPTQModel, Triton, Marlin, and
-ExLLaMAV2 for providing low-precision CUDA kernels, which are leveraged in AutoRound.
+特别感谢 AutoGPTQ、AutoAWQ、GPTQModel、Triton、Marlin 以及 ExLLaMAV2 等开源低精度库，为 AutoRound 提供了低精度 CUDA 内核支持。

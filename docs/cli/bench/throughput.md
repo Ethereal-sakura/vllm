@@ -1,9 +1,9 @@
 # vllm bench throughput
 
-## JSON CLI Arguments
+## JSON CLI 参数
 
 --8<-- "docs/cli/json_tip.inc.md"
 
-## Options
+## 选项
 
 --8<-- "docs/argparse/bench_throughput.md"

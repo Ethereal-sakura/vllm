@@ -1,17 +1,17 @@
-# Retrieval-Augmented Generation
+# 检索增强生成（Retrieval-Augmented Generation）
 
-[Retrieval-augmented generation (RAG)](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) is a technique that enables generative artificial intelligence (Gen AI) models to retrieve and incorporate new information. It modifies interactions with a large language model (LLM) so that the model responds to user queries with reference to a specified set of documents, using this information to supplement information from its pre-existing training data. This allows LLMs to use domain-specific and/or updated information. Use cases include providing chatbot access to internal company data or generating responses based on authoritative sources.
+[检索增强生成（Retrieval-augmented generation，简称 RAG）](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) 是一种让生成式人工智能（Generative AI，Gen AI）模型能够检索并融合新信息的技术。它通过调整与大语言模型（Large Language Model，LLM）的交互方式，使模型在回答用户提问时，能够参考一组指定的文档，将这些文档的信息与模型已有的训练数据结合起来补充答案。这样，LLM 就可以利用特定领域的信息或最新的数据。例如，可以让聊天机器人访问公司内部数据，或基于权威来源生成回复。
 
-Here are the integrations:
+目前支持的集成方式有：
 
 - vLLM + [langchain](https://github.com/langchain-ai/langchain) + [milvus](https://github.com/milvus-io/milvus)
 - vLLM + [llamaindex](https://github.com/run-llama/llama_index) + [milvus](https://github.com/milvus-io/milvus)
 
 ## vLLM + langchain
 
-### Prerequisites
+### 环境准备
 
-Set up the vLLM and langchain environment:
+先配置好 vLLM 和 langchain 的环境：
 
 ```bash
 pip install -U vllm \
@@ -20,25 +20,25 @@ pip install -U vllm \
             langchain-text-splitters
 ```
 
-### Deploy
+### 部署步骤
 
-1. Start the vLLM server with the supported embedding model, e.g.
+1. 启动支持 embedding 的 vLLM 服务，例如：
 
     ```bash
-    # Start embedding service (port 8000)
+    # 启动 embedding 服务（端口 8000）
     vllm serve ssmits/Qwen2-7B-Instruct-embed-base
     ```
 
-1. Start the vLLM server with the supported chat completion model, e.g.
+2. 启动支持对话生成的 vLLM 服务，例如：
 
     ```bash
-    # Start chat service (port 8001)
+    # 启动聊天服务（端口 8001）
     vllm serve qwen/Qwen1.5-0.5B-Chat --port 8001
     ```
 
-1. Use the script: [examples/online_serving/retrieval_augmented_generation_with_langchain.py](../../../examples/online_serving/retrieval_augmented_generation_with_langchain.py)
+3. 使用脚本：[examples/online_serving/retrieval_augmented_generation_with_langchain.py](../../../examples/online_serving/retrieval_augmented_generation_with_langchain.py)
 
-1. Run the script
+4. 运行脚本
 
     ```bash
     python retrieval_augmented_generation_with_langchain.py
@@ -46,9 +46,9 @@ pip install -U vllm \
 
 ## vLLM + llamaindex
 
-### Prerequisites
+### 环境准备
 
-Set up the vLLM and llamaindex environment:
+先配置好 vLLM 和 llamaindex 的环境：
 
 ```bash
 pip install vllm \
@@ -58,25 +58,25 @@ pip install vllm \
             llama-index-vector-stores-milvus \
 ```
 
-### Deploy
+### 部署步骤
 
-1. Start the vLLM server with the supported embedding model, e.g.
+1. 启动支持 embedding 的 vLLM 服务，例如：
 
     ```bash
-    # Start embedding service (port 8000)
+    # 启动 embedding 服务（端口 8000）
     vllm serve ssmits/Qwen2-7B-Instruct-embed-base
     ```
 
-1. Start the vLLM server with the supported chat completion model, e.g.
+2. 启动支持对话生成的 vLLM 服务，例如：
 
     ```bash
-    # Start chat service (port 8001)
+    # 启动聊天服务（端口 8001）
     vllm serve qwen/Qwen1.5-0.5B-Chat --port 8001
     ```
 
-1. Use the script: [examples/online_serving/retrieval_augmented_generation_with_llamaindex.py](../../../examples/online_serving/retrieval_augmented_generation_with_llamaindex.py)
+3. 使用脚本：[examples/online_serving/retrieval_augmented_generation_with_llamaindex.py](../../../examples/online_serving/retrieval_augmented_generation_with_llamaindex.py)
 
-1. Run the script:
+4. 运行脚本：
 
     ```bash
     python retrieval_augmented_generation_with_llamaindex.py

@@ -2,183 +2,152 @@
 
 !!! announcement
 
-    We have started the process of deprecating V0. Please read [RFC #18571](https://github.com/vllm-project/vllm/issues/18571) for more details.
+    我们已经开始弃用 V0，详情请阅读 [RFC #18571](https://github.com/vllm-project/vllm/issues/18571)
 
-V1 is now enabled by default for all supported use cases, and we will gradually enable it for every use case we plan to support. Please share any feedback on [GitHub](https://github.com/vllm-project/vllm) or in the [vLLM Slack](https://inviter.co/vllm-slack).
+V1 现已默认启用，适用于所有支持的使用场景，我们会逐步为计划支持的其它场景开放。欢迎在 [GitHub](https://github.com/vllm-project/vllm) 或 [vLLM Slack](https://inviter.co/vllm-slack) 分享你的反馈。
 
-To disable V1, please set the environment variable as: `VLLM_USE_V1=0`, and send us a GitHub issue sharing the reason!
+如需禁用 V1，请设置环境变量为：`VLLM_USE_V1=0`，并通过 GitHub issue 告诉我们你的原因！
 
-## Why vLLM V1?
+## 为什么要推出 vLLM V1？
 
-vLLM V0 successfully supported a wide range of models and hardware, but as new features were developed independently, the system grew increasingly complex. This complexity made it harder to integrate new capabilities and introduced technical debt, revealing the need for a more streamlined and unified design.
+vLLM V0 成功支持了多种模型和硬件，但随着新特性的独立开发，系统变得越来越复杂。这种复杂度导致新功能集成变得困难，技术债务也逐渐积累，因此我们需要一个更加简洁统一的系统设计。
 
-Building on V0’s success, vLLM V1 retains the stable and proven components from V0
-(such as the models, GPU kernels, and utilities). At the same time, it significantly
-re-architects the core systems, covering the scheduler, KV cache manager, worker,
-sampler, and API server, to provide a cohesive, maintainable framework that better
-accommodates continued growth and innovation.
+在 V0 成功经验的基础上，vLLM V1 保留了 V0 的稳定核心组件（如模型、GPU 内核和工具），同时对调度器、KV 缓存管理器、工作线程、采样器、API 服务器等核心系统进行了全面重构，打造更加一体化、易维护的框架，更好地支持持续发展和创新。
 
-Specifically, V1 aims to:
+V1 的主要目标包括：
 
-- Provide a **simple, modular, and easy-to-hack codebase**.
-- Ensure **high performance** with near-zero CPU overhead.
-- **Combine key optimizations** into a unified architecture.
-- Require **zero configs** by enabling features/optimizations by default.
+- 提供一个**简单、模块化、易于修改的代码库**
+- 实现**高性能**，几乎不占用 CPU 资源
+- **整合核心优化**，统一架构
+- **零配置**，默认启用特性和优化，无需手动设置
 
-We see significant performance improvements from upgrading to V1 core engine, in
-particular for long context scenarios. Please see performance benchmark (To be
-added).
+升级到 V1 核心引擎后，特别是在长上下文场景下，性能有显著提升。性能基准测试稍后补充。
 
-For more details, check out the vLLM V1 blog post [vLLM V1: A Major
-Upgrade to vLLM’s Core Architecture](https://blog.vllm.ai/2025/01/27/v1-alpha-release.html) (published Jan 27, 2025).
+更多信息可阅读 vLLM V1 的博客文章 [vLLM V1: A Major Upgrade to vLLM’s Core Architecture](https://blog.vllm.ai/2025/01/27/v1-alpha-release.html)（2025 年 1 月 27 日发布）。
 
-This living user guide outlines a few known **important changes and limitations** introduced by vLLM V1. The team has been working actively to bring V1 as the default engine, therefore this guide will be updated constantly as more features get supported on vLLM V1.
+本用户指南将持续更新，介绍 vLLM V1 带来的**重要变更与限制**。团队正积极将 V1 作为默认引擎，后续更多特性上线时本指南也会及时补充。
 
-## Current Status
+## 当前进展
 
-For each item, our progress towards V1 support falls into one of the following states:
+每项功能对应以下几种状态之一：
 
-- **🚀 Optimized**: Nearly fully optimized, with no further work currently planned.
-- **🟢 Functional**: Fully operational, with ongoing optimizations.
-- **🚧 WIP**: Under active development.
-- **🟡 Planned**: Scheduled for future implementation (some may have open PRs/RFCs).
-- **🟠 Delayed**: Temporarily dropped in V1 but planned to be re-introduced later.
-- **🔴 Deprecated**: Not planned for V1 unless there is strong demand.
+- **🚀 优化完成**：几乎完全优化，无需进一步开发
+- **🟢 可用**：功能完整，持续优化中
+- **🚧 开发中**：正在积极开发
+- **🟡 计划中**：未来计划开发（部分已有 PR/RFC）
+- **🟠 延期**：V1 暂未支持，未来会重新引入
+- **🔴 已弃用**：除非有强烈需求，否则不再支持
 
 !!! note
-    vLLM V1’s unified scheduler treats both prompt and output tokens the same
-    way by using a simple dictionary (e.g., `{request_id: num_tokens}`) to dynamically
-    allocate a fixed token budget per request, enabling features like chunked prefills,
-    prefix caching, and speculative decoding without a strict separation between prefill
-    and decode phases.
+    vLLM V1 采用统一调度器，通过简单字典（如 `{request_id: num_tokens}`）对每个请求动态分配固定的 Token 配额，将提示（prompt）和输出 Token 一视同仁，无需严格区分预填充和解码阶段。这使得分段预填充、前缀缓存、猜测式解码等特性得以支持。
 
-The V1 scheduler supports multiple scheduling policies, including First-Come,
-First-Served (FCFS) and priority-based scheduling (where requests are processed
-based on assigned priority, with FCFS as a tie-breaker), configurable via the
-`--scheduling-policy` argument.
+V1 调度器支持多种调度策略，包括先进先出（FCFS）和基于优先级的调度（根据分配的优先级处理请求，FCFS 作为优先级相同时的判定标准），可通过 `--scheduling-policy` 参数配置。
 
-### Hardware
+### 硬件支持
 
-| Hardware   | Status                                        |
-|------------|-----------------------------------------------|
-| **NVIDIA** | <nobr>🚀</nobr>                               |
-| **AMD**    | <nobr>🟢</nobr>                               |
-| **INTEL GPU**    | <nobr>🟢</nobr>                               |
-| **TPU**    | <nobr>🟢</nobr>                               |
+| 硬件       | 状态                                         |
+|------------|----------------------------------------------|
+| **NVIDIA** | <nobr>🚀</nobr>                              |
+| **AMD**    | <nobr>🟢</nobr>                              |
+| **INTEL GPU**    | <nobr>🟢</nobr>                              |
+| **TPU**    | <nobr>🟢</nobr>                              |
 | **CPU**    | <nobr>🟢 (x86\_64/aarch64) 🟡 (MacOS) </nobr> |
 
 !!! note
 
-    More hardware platforms may be supported via plugins, e.g.:
+    更多硬件平台可以通过插件支持，例如：
 
     - [vllm-ascend](https://github.com/vllm-project/vllm-ascend)
     - [vllm-spyre](https://github.com/vllm-project/vllm-spyre)
     - [vllm-gaudi](https://github.com/vllm-project/vllm-gaudi)
     - [vllm-openvino](https://github.com/vllm-project/vllm-openvino)
 
-    Please check their corresponding repositories for more details.
+    详情请查看对应项目的仓库。
 
-### Models
+### 模型支持
 
-| Model Type                  | Status                                                                             |
-|-----------------------------|------------------------------------------------------------------------------------|
-| **Decoder-only Models**     | <nobr>🚀 Optimized</nobr>                                                          |
-| **Encoder-Decoder Models**  | <nobr>🟢 Whisper only</nobr>                                                       |
-| **Embedding Models**        | <nobr>🟢 Functional</nobr>                                                         |
-| **Mamba Models**            | <nobr>🟢 (Mamba-2), 🟢 (Mamba-1)</nobr>                                            |
-| **Multimodal Models**       | <nobr>🟢 Functional</nobr>                                                         |
+| 模型类型                     | 状态                                                                             |
+|-----------------------------|----------------------------------------------------------------------------------|
+| **仅解码模型**               | <nobr>🚀 优化完成</nobr>                                                         |
+| **编码-解码模型**            | <nobr>🟢 仅支持 Whisper</nobr>                                                   |
+| **Embedding 模型**           | <nobr>🟢 可用</nobr>                                                             |
+| **Mamba 模型**               | <nobr>🟢 (Mamba-2), 🟢 (Mamba-1)</nobr>                                          |
+| **多模态模型**               | <nobr>🟢 可用</nobr>                                                             |
 
-See below for the status of models that are not yet supported or have more features planned in V1.
+下方有关于部分尚未支持或 V1 计划新增特性的模型的说明。
 
-#### Embedding Models
+#### Embedding 模型
 
-The initial basic support is now functional.
+基础支持已实现，目前可用。
 
-Later, we will consider using [hidden states processor](https://github.com/vllm-project/vllm/issues/12249),
-which is based on [global logits processor](https://github.com/vllm-project/vllm/pull/13360)
-to enable simultaneous generation and embedding using the same engine instance in V1.
+后续我们会考虑集成 [hidden states processor](https://github.com/vllm-project/vllm/issues/12249)，该方案基于 [global logits processor](https://github.com/vllm-project/vllm/pull/13360)，实现同一引擎实例下同时支持生成与 embedding 功能。
 
-#### Mamba Models
+#### Mamba 模型
 
-Models using selective state-space mechanisms instead of standard transformer attention are supported.
-Models that use Mamba-2 and Mamba-1 layers (e.g., `Mamba2ForCausalLM`, `MambaForCausalLM`,`FalconMambaForCausalLM`) are supported.
+支持采用 selective state-space 机制（不同于标准 Transformer 注意力机制）的模型。
+支持包含 Mamba-2 和 Mamba-1 层的模型（如 `Mamba2ForCausalLM`, `MambaForCausalLM`, `FalconMambaForCausalLM`）。
 
-Hybrid models that combine Mamba-2 and Mamba-1 layers with standard attention layers are also supported (e.g., `BambaForCausalLM`,
-`Zamba2ForCausalLM`, `NemotronHForCausalLM`, `FalconH1ForCausalLM` and `GraniteMoeHybridForCausalLM`, `JambaForCausalLM`, `Plamo2ForCausalLM`).
+同时支持将 Mamba-2、Mamba-1 层与标准注意力层混合的混合模型（如 `BambaForCausalLM`、`Zamba2ForCausalLM`、`NemotronHForCausalLM`、`FalconH1ForCausalLM`、`GraniteMoeHybridForCausalLM`、`JambaForCausalLM`、`Plamo2ForCausalLM`）。
 
-Hybrid models with mechanisms different to Mamba are also supported (e.g, `MiniMaxText01ForCausalLM`, `MiniMaxM1ForCausalLM`, `Lfm2ForCausalLM`).
+也支持采用其他机制的混合模型（如 `MiniMaxText01ForCausalLM`、`MiniMaxM1ForCausalLM`、`Lfm2ForCausalLM`）。
 
-Please note that prefix caching is not yet supported for any of the above models.
+请注意，上述所有模型目前暂不支持前缀缓存（prefix caching）。
 
-#### Encoder-Decoder Models
+#### 编码-解码模型
 
-Whisper is supported. Other models requiring cross-attention between separate
-encoder and decoder (e.g., `BartForConditionalGeneration`,
-`MllamaForConditionalGeneration`) are not supported.
+目前仅支持 Whisper。对于需要在编码器和解码器间进行交叉注意力的其它模型（如 `BartForConditionalGeneration`、`MllamaForConditionalGeneration`），暂不支持。
 
-### Features
+### 功能特性
 
-| Feature                                     | Status                                                                            |
-|---------------------------------------------|-----------------------------------------------------------------------------------|
-| **Prefix Caching**                          | <nobr>🚀 Optimized</nobr>                                                         |
-| **Chunked Prefill**                         | <nobr>🚀 Optimized</nobr>                                                         |
-| **LoRA**                                    | <nobr>🚀 Optimized</nobr>                                                         |
-| **Logprobs Calculation**                    | <nobr>🟢 Functional</nobr>                                                        |
-| **FP8 KV Cache**                            | <nobr>🟢 Functional on Hopper devices (<https://github.com/vllm-project/vllm/pull/15191>)</nobr>|
-| **Spec Decode**                             | <nobr>🚀 Optimized</nobr>                                                         |
-| **Prompt Logprobs with Prefix Caching**     | <nobr>🟡 Planned ([RFC #13414](https://github.com/vllm-project/vllm/issues/13414))</nobr>|
-| **Structured Output Alternative Backends**  | <nobr>🟢 Functional</nobr>                                                        |
-| **Request-level Structured Output Backend** | <nobr>🔴 Deprecated</nobr>                                                        |
-| **best_of**                                 | <nobr>🔴 Deprecated ([RFC #13361](https://github.com/vllm-project/vllm/issues/13361))</nobr>|
-| **Per-Request Logits Processors**           | <nobr>🔴 Deprecated ([RFC #13360](https://github.com/vllm-project/vllm/pull/13360))</nobr> |
-| **GPU <> CPU KV Cache Swapping**            | <nobr>🔴 Deprecated</nobr>                                                        |
+| 功能特性                                  | 状态                                                                             |
+|-------------------------------------------|----------------------------------------------------------------------------------|
+| **前缀缓存（Prefix Caching）**            | <nobr>🚀 优化完成</nobr>                                                          |
+| **分段预填充（Chunked Prefill）**         | <nobr>🚀 优化完成</nobr>                                                          |
+| **LoRA**                                 | <nobr>🚀 优化完成</nobr>                                                          |
+| **Logprobs 计算**                        | <nobr>🟢 可用</nobr>                                                              |
+| **FP8 KV 缓存**                          | <nobr>🟢 Hopper 设备上可用 (<https://github.com/vllm-project/vllm/pull/15191>)</nobr>|
+| **Spec Decode**                          | <nobr>🚀 优化完成</nobr>                                                          |
+| **带前缀缓存的 Prompt Logprobs**         | <nobr>🟡 计划中 ([RFC #13414](https://github.com/vllm-project/vllm/issues/13414))</nobr>|
+| **结构化输出备用后端**                    | <nobr>🟢 可用</nobr>                                                              |
+| **请求级结构化输出后端**                  | <nobr>🔴 已弃用</nobr>                                                            |
+| **best_of**                              | <nobr>🔴 已弃用 ([RFC #13361](https://github.com/vllm-project/vllm/issues/13361))</nobr>|
+| **单请求 Logits 处理器**                  | <nobr>🔴 已弃用 ([RFC #13360](https://github.com/vllm-project/vllm/pull/13360))</nobr> |
+| **GPU <> CPU KV 缓存交换**               | <nobr>🔴 已弃用</nobr>                                                            |
 
 !!! note
 
-    vLLM V1’s unified scheduler treats both prompt and output tokens the same
-    way by using a simple dictionary (e.g., `{request_id: num_tokens}`) to dynamically
-    allocate a fixed token budget per request, enabling features like chunked prefills,
-    prefix caching, and speculative decoding without a strict separation between prefill
-    and decode phases.
+    vLLM V1 采用统一调度器，通过简单字典（如 `{request_id: num_tokens}`）对每个请求动态分配固定的 Token 配额，将提示和输出 Token 一视同仁，无需严格区分预填充和解码阶段。这使得分段预填充、前缀缓存、猜测式解码等特性得以支持。
 
-#### Semantic Changes to Logprobs
+#### Logprobs 语义变更
 
-vLLM V1 supports logprobs and prompt logprobs. However, there are some important semantic
-differences compared to V0:
+vLLM V1 支持 logprobs 以及 prompt logprobs，但与 V0 相比有一些重要语义差异：
 
-##### Logprobs Calculation
+##### Logprobs 计算方式
 
-By default, logprobs in V1 are now returned immediately once computed from the model’s raw output (i.e.
-before applying any logits post-processing such as temperature scaling or penalty
-adjustments). As a result, the returned logprobs do not reflect the final adjusted
-probabilities used during sampling.
+默认情况下，V1 会在模型原始输出后立刻返回 logprobs（即还未经过任何 logits 后处理，如温度缩放或惩罚项调整）。因此，最终返回的 logprobs 并不代表采样时实际使用的概率分布。
 
-You can adjust this behavior by setting the `--logprobs-mode` flag.
-Four modes are supported: `raw_logprobs` (default), `processed_logprobs`, `raw_logits`, `processed_logits`.
-Raw means the values before applying any logit processors, like bad words.
-Processed means the values after applying all processors, including temperature and top_k/top_p.
+你可以通过设置 `--logprobs-mode` 参数调整这一行为。
+共支持四种模式：`raw_logprobs`（默认）、`processed_logprobs`、`raw_logits`、`processed_logits`。
+Raw 表示未经过任何 logits 处理器（如禁止词等）前的值；
+Processed 表示经过所有处理器（包括温度、top_k/top_p 等）后的值。
 
-##### Prompt Logprobs with Prefix Caching
+##### 带前缀缓存的 Prompt Logprobs
 
-Logprobs are not cached. For a request requiring prompt logprobs, the engine will ignore the prefix cache and recompute the prefill of full prompt to generate the logprobs.
+logprobs 不会被缓存。如果请求需要 prompt logprobs，引擎会忽略前缀缓存，重新计算整个 prompt 的预填充以生成 logprobs。
 
-#### Deprecated Features
+#### 已弃用特性
 
-As part of the major architectural rework in vLLM V1, several legacy features have been deprecated.
+由于 V1 的架构重大重构，部分旧特性被正式弃用。
 
-##### Sampling features
+##### 采样相关特性
 
-- **best_of**: This feature has been deprecated due to limited usage. See details at [RFC #13361](https://github.com/vllm-project/vllm/issues/13361).
-- **Per-Request Logits Processors**: In V0, users could pass custom
-  processing functions to adjust logits on a per-request basis. In vLLM V1, this
-  feature has been deprecated. Instead, the design is moving toward supporting **global logits
-  processors**, a feature the team is actively working on for future releases. See details at [RFC #13360](https://github.com/vllm-project/vllm/pull/13360).
+- **best_of**：由于使用场景有限，该特性已弃用。详见 [RFC #13361](https://github.com/vllm-project/vllm/issues/13361)
+- **单请求 Logits 处理器**：V0 支持为每个请求自定义 logits 处理函数，V1 已弃用该功能。后续将支持**全局 logits 处理器**，目前团队正在积极研发。详见 [RFC #13360](https://github.com/vllm-project/vllm/pull/13360)
 
-##### KV Cache features
+##### KV 缓存相关特性
 
-- **GPU <> CPU KV Cache Swapping**: with the new simplified core architecture, vLLM V1 no longer requires KV cache swapping
-to handle request preemptions.
+- **GPU <> CPU KV 缓存交换**：全新简化的核心架构下，V1 已无需通过 KV 缓存交换来处理请求抢占。
 
-##### Structured Output features
+##### 结构化输出相关特性
 
-- **Request-level Structured Output Backend**: Deprecated, alternative backends (outlines, guidance) with fallbacks is supported now.
+- **请求级结构化输出后端**：已弃用，现已支持备用后端（outlines、guidance）和回退机制。

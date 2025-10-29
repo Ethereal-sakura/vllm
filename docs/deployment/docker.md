@@ -1,9 +1,9 @@
-# Using Docker
+# 使用 Docker
 
-## Use vLLM's Official Docker Image
+## 使用 vLLM 官方 Docker 镜像
 
-vLLM offers an official Docker image for deployment.
-The image can be used to run OpenAI compatible server and is available on Docker Hub as [vllm/vllm-openai](https://hub.docker.com/r/vllm/vllm-openai/tags).
+vLLM 提供了官方的 Docker 镜像，方便部署使用。
+这个镜像可以用于运行兼容 OpenAI 的服务端，并已在 Docker Hub 上发布：[vllm/vllm-openai](https://hub.docker.com/r/vllm/vllm-openai/tags)
 
 ```bash
 docker run --runtime nvidia --gpus all \
@@ -15,7 +15,7 @@ docker run --runtime nvidia --gpus all \
     --model Qwen/Qwen3-0.6B
 ```
 
-This image can also be used with other container engines such as [Podman](https://podman.io/).
+这个镜像同样可以搭配其他容器引擎使用，比如 [Podman](https://podman.io/)。
 
 ```bash
 podman run --device nvidia.com/gpu=all \
@@ -27,32 +27,28 @@ podman run --device nvidia.com/gpu=all \
   --model Qwen/Qwen3-0.6B
 ```
 
-You can add any other [engine-args](../configuration/engine_args.md) you need after the image tag (`vllm/vllm-openai:latest`).
+你可以在镜像标签（如 `vllm/vllm-openai:latest`）后面，添加你需要的其他 [engine-args](../configuration/engine_args.md)。
 
 !!! note
-    You can either use the `ipc=host` flag or `--shm-size` flag to allow the
-    container to access the host's shared memory. vLLM uses PyTorch, which uses shared
-    memory to share data between processes under the hood, particularly for tensor parallel inference.
+    你可以选择使用 `ipc=host` 参数或 `--shm-size` 参数，以允许容器访问主机的共享内存。vLLM 使用 PyTorch，而 PyTorch 在底层会使用共享内存来在多个进程间共享数据，尤其是在进行张量并行推理时。
 
 !!! note
-    Optional dependencies are not included in order to avoid licensing issues (e.g. <https://github.com/vllm-project/vllm/issues/8030>).
+    镜像中未包含可选依赖项，以避免相关的许可问题（如 <https://github.com/vllm-project/vllm/issues/8030>）
 
-    If you need to use those dependencies (having accepted the license terms),
-    create a custom Dockerfile on top of the base image with an extra layer that installs them:
+    如果你需要使用这些可选依赖（并且你已同意相关许可条款），可以基于基础镜像自定义 Dockerfile，在其上增加安装所需依赖的新层：
 
     ```Dockerfile
     FROM vllm/vllm-openai:v0.11.0
 
-    # e.g. install the `audio` optional dependencies
-    # NOTE: Make sure the version of vLLM matches the base image!
+    # 例如，安装 `audio` 可选依赖
+    # 注意：请确保 vLLM 的版本与你的基础镜像一致！
     RUN uv pip install --system vllm[audio]==0.11.0
     ```
 
 !!! tip
-    Some new models may only be available on the main branch of [HF Transformers](https://github.com/huggingface/transformers).
+    有些新模型可能只在 [HF Transformers](https://github.com/huggingface/transformers) 的主分支上才可以使用。
 
-    To use the development version of `transformers`, create a custom Dockerfile on top of the base image
-    with an extra layer that installs their code from source:
+    如果你需要使用开发版的 `transformers`，可以基于官方基础镜像自定义 Dockerfile，在其上直接从源码安装：
 
     ```Dockerfile
     FROM vllm/vllm-openai:latest
@@ -60,12 +56,12 @@ You can add any other [engine-args](../configuration/engine_args.md) you need af
     RUN uv pip install --system git+https://github.com/huggingface/transformers.git
     ```
 
-## Building vLLM's Docker Image from Source
+## 从源码构建 vLLM Docker 镜像
 
-You can build and run vLLM from source via the provided [docker/Dockerfile](../../docker/Dockerfile). To build vLLM:
+你可以通过项目提供的 [docker/Dockerfile](../../docker/Dockerfile) 从源码构建并运行 vLLM。构建命令如下：
 
 ```bash
-# optionally specifies: --build-arg max_jobs=8 --build-arg nvcc_threads=2
+# 可选参数：--build-arg max_jobs=8 --build-arg nvcc_threads=2
 DOCKER_BUILDKIT=1 docker build . \
     --target vllm-openai \
     --tag vllm/vllm-openai \
@@ -73,27 +69,21 @@ DOCKER_BUILDKIT=1 docker build . \
 ```
 
 !!! note
-    By default vLLM will build for all GPU types for widest distribution. If you are just building for the
-    current GPU type the machine is running on, you can add the argument `--build-arg torch_cuda_arch_list=""`
-    for vLLM to find the current GPU type and build for that.
+    默认情况下，vLLM 会为所有 GPU 类型进行构建，以便适配更广泛的硬件。如果你只需为当前机器的 GPU 类型构建，可以添加参数 `--build-arg torch_cuda_arch_list=""`，让 vLLM 自动检测当前 GPU 类型并为其构建。
 
-    If you are using Podman instead of Docker, you might need to disable SELinux labeling by
-    adding `--security-opt label=disable` when running `podman build` command to avoid certain [existing issues](https://github.com/containers/buildah/discussions/4184).
+    如果你使用 Podman 而非 Docker，建议在执行 `podman build` 时添加 `--security-opt label=disable`，以避免某些已知 [问题](https://github.com/containers/buildah/discussions/4184)。
 
-## Building for Arm64/aarch64
+## 针对 Arm64/aarch64 构建
 
-A docker container can be built for aarch64 systems such as the Nvidia Grace-Hopper. At time of this writing, this requires the use
-of PyTorch Nightly and should be considered **experimental**. Using the flag `--platform "linux/arm64"` will attempt to build for arm64.
+你可以为 aarch64 架构（如 Nvidia Grace-Hopper）构建 docker 容器。目前，这需要使用 PyTorch Nightly 版本，并且属于**实验性功能**。通过添加 `--platform "linux/arm64"` 参数即可尝试为 arm64 构建。
 
 !!! note
-    Multiple modules must be compiled, so this process can take a while. Recommend using `--build-arg max_jobs=` & `--build-arg nvcc_threads=`
-    flags to speed up build process. However, ensure your `max_jobs` is substantially larger than `nvcc_threads` to get the most benefits.
-    Keep an eye on memory usage with parallel jobs as it can be substantial (see example below).
+    由于需要编译多个模块，整个构建过程可能会耗时较长。建议搭配 `--build-arg max_jobs=` 与 `--build-arg nvcc_threads=` 参数来加速构建过程。但要确保 `max_jobs` 的值远大于 `nvcc_threads`，这样效果更佳。并且注意多任务并行时的内存占用可能会非常大（见下方示例）。
 
-??? console "Command"
+??? console "命令示例"
 
     ```bash
-    # Example of building on Nvidia GH200 server. (Memory usage: ~15GB, Build time: ~1475s / ~25 min, Image size: 6.93GB)
+    # 下面是在 Nvidia GH200 服务器上的构建示例。（内存占用约 15GB，构建时长约 1475 秒 / 25 分钟，镜像大小 6.93GB）
     python3 use_existing_torch.py
     DOCKER_BUILDKIT=1 docker build . \
     --file docker/Dockerfile \
@@ -106,19 +96,19 @@ of PyTorch Nightly and should be considered **experimental**. Using the flag `--
     ```
 
 !!! note
-    If you are building the `linux/arm64` image on a non-ARM host (e.g., an x86_64 machine), you need to ensure your system is set up for cross-compilation using QEMU. This allows your host machine to emulate ARM64 execution.
+    如果你在非 ARM 主机上（如 x86_64 机器）构建 `linux/arm64` 镜像，需要确保系统已配置好 QEMU 以实现交叉编译，这样主机才能模拟 ARM64 的运行环境。
 
-    Run the following command on your host machine to register QEMU user static handlers:
+    请在主机上执行以下命令来注册 QEMU user static 处理器：
 
     ```bash
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
     ```
 
-    After setting up QEMU, you can use the `--platform "linux/arm64"` flag in your `docker build` command.
+    完成 QEMU 配置后，即可在 `docker build` 命令中使用 `--platform "linux/arm64"` 参数了。
 
-## Use the custom-built vLLM Docker image
+## 使用自定义构建的 vLLM Docker 镜像
 
-To run vLLM with the custom-built Docker image:
+使用自定义构建的 Docker 镜像运行 vLLM：
 
 ```bash
 docker run --runtime nvidia --gpus all \
@@ -128,7 +118,7 @@ docker run --runtime nvidia --gpus all \
     vllm/vllm-openai <args...>
 ```
 
-The argument `vllm/vllm-openai` specifies the image to run, and should be replaced with the name of the custom-built image (the `-t` tag from the build command).
+这里的 `vllm/vllm-openai` 表示要运行的镜像标签，你可以替换成你构建时自定义的镜像名（即 build 命令中的 `-t` 标签）。
 
 !!! note
-    **For version 0.4.1 and 0.4.2 only** - the vLLM docker images under these versions are supposed to be run under the root user since a library under the root user's home directory, i.e. `/root/.config/vllm/nccl/cu12/libnccl.so.2.18.1` is required to be loaded during runtime. If you are running the container under a different user, you may need to first change the permissions of the library (and all the parent directories) to allow the user to access it, then run vLLM with environment variable `VLLM_NCCL_SO_PATH=/root/.config/vllm/nccl/cu12/libnccl.so.2.18.1` .
+    **仅限 0.4.1 和 0.4.2 版本** —— 这两个版本的 vLLM docker 镜像需要以 root 用户身份运行，因为运行时需要加载 root 用户家目录下的一个库文件，即 `/root/.config/vllm/nccl/cu12/libnccl.so.2.18.1`。如果你要用其他用户运行容器，请先修改该库文件（及其父目录）的权限，使其能被该用户访问，然后运行 vLLM 时通过环境变量 `VLLM_NCCL_SO_PATH=/root/.config/vllm/nccl/cu12/libnccl.so.2.18.1` 指定库路径。

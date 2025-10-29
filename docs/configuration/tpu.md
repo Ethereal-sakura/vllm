@@ -1,111 +1,111 @@
-# TPU Optimization Tips
+# TPU 优化小贴士
 
-This doc serves as a collection of handy tips for optimizing your vLLM on TPU workload.
+本文档收集了一些优化 vLLM 在 TPU 上运行的实用技巧。
 
-## Get started
+## 快速开始
 
-Looking for setup and installation instructions? Find them [here](../getting_started/installation/google_tpu.md).
+需要了解安装和设置流程？请参阅[这里](../getting_started/installation/google_tpu.md)。
 
-### TPU workload sizing
+### TPU 任务规模选择
 
-When selecting the ideal number of chips for a single serving instance, it's important to account for both the model size and the average request context length. Adequate HBM for the KV cache is essential to ensure a sufficient number of concurrent requests can be processed.
+在确定单个服务实例需要多少芯片时，应该同时考虑模型大小和平均请求上下文长度。KV 缓存的 HBM 充足很关键，这样才能保证足够的并发请求处理能力。
 
-The following colab [calculator](https://colab.research.google.com/github/ericehanley/rightsize-vllm/blob/main/HBM_Calculator.ipynb) will tell you:
+你可以使用下面的 colab [计算器](https://colab.research.google.com/github/ericehanley/rightsize-vllm/blob/main/HBM_Calculator.ipynb)，它可以帮你估算：
 
-- KV cache size requirement per token and per request
-- TPU/GPU memory consumed by the model weights
-- TPU/GPU memory allocated for the KV cache
-- Maximum \# of requests you can approximately set (--max-num-seqs)
+- 每个 token 和每个请求所需的 KV 缓存大小
+- TPU/GPU 被模型权重占用的内存
+- TPU/GPU 分配给 KV 缓存的内存
+- 你大致能设置的最大并发请求数（--max-num-seqs）
 
-This approach serves as a general rule of thumb.
+这些建议可以作为常规参考。
 
-#### Latency-throughput tradeoff
+#### 延迟与吞吐量的权衡
 
-As with rightsizing the number of chips for your workload, consider adjusting `--max-num-seqs` to fine-tune the latency-throughput balance. Decreasing `--max-num-seqs` and/or increasing the number of chips can help reduce latency.
+在确定芯片数量的同时，可以通过调整 `--max-num-seqs` 来平衡延迟与吞吐量。减少 `--max-num-seqs` 或增加芯片数量，都有助于降低延迟。
 
-`--max-num-seqs` defines the number of concurrent decode slots, effectively limiting the number of requests the server can process tokens for simultaneously. Increasing this value allows the server to pre-allocate more HBM to handle a higher number of concurrent requests, which can maximize overall throughput. However, this often increases the end-to-end (e2e) latency per request.
+`--max-num-seqs` 表示并发解码槽的数量，本质上限制了服务器同时处理 token 的请求数量。增大该值，服务器会预分配更多 HBM，从而能支持更多并发请求，提升总体吞吐量。但这通常也会增加每个请求的端到端（e2e）延迟。
 
-Therefore, carefully tuning `--max-num-seqs` is crucial to achieving the desired balance between latency and throughput for your specific workload.
+因此，合理调整 `--max-num-seqs` 对于你的具体任务来说非常重要，可以达到理想的延迟和吞吐量平衡。
 
-In a similar way, `--max-num-batch-tokens` can be adjusted down to improve latency, or adjusted up to improve throughput.
+同理，也可以通过调低 `--max-num-batch-tokens` 来提升延迟，或者调高提升吞吐量。
 
-#### Compilation and Caching
+#### 编译与缓存机制
 
-Coming from a GPU background, one of the key differences you'll notice with TPUs is an initial compilation step. TPUs are specialized accelerators (ASICs) that achieve maximum performance by executing pre-compiled, static computation graphs via the XLA compiler. Unlike GPUs, which can handle dynamic input shapes more flexibly, TPUs require a specific compiled graph for each tensor shape (e.g., batch size and sequence length) they process.
+如果你有 GPU 使用经验，会发现 TPU 有一个显著不同：首次运行会有编译步骤。TPU 属于专用加速芯片（ASIC），通过 XLA 编译器执行预编译的静态计算图，从而获得最高性能。与 GPU 能较灵活处理动态输入形状不同，TPU 必须针对每种 tensor 形状（比如 batch size 和序列长度）都编译出专属计算图。
 
-To manage this, vLLM performs a one-time "warmup" process when you first launch the server. During this phase, it pre-compiles the model for various common input shapes and saves these compiled graphs to a cache on disk or remote storage (located at `~/.cache/vllm/xla_cache` by default). This process can range significantly, anywhere from a few minutes to an hour depending on the size of the model and context length used.
+为此，vLLM 在服务器首次启动时会进行一次“预热”，提前为常见输入形状编译模型，并将编译好的计算图缓存到本地磁盘或远程存储（默认路径为 `~/.cache/vllm/xla_cache`）。这个过程耗时从几分钟到一小时不等，取决于模型规模和上下文长度。
 
-Although the first compilation can take some time, for all subsequent server launches, vLLM can load these graphs directly from the cache, eliminating the compilation time for future runs.
+虽然首次编译较慢，但后续启动服务器时，vLLM 可以直接从缓存加载这些计算图，无需再次编译，大幅缩短启动时间。
 
-Use `VLLM_XLA_CACHE_PATH` environment variable to write to shareable storage for future deployed nodes (like when using autoscaling).
+你可以设置环境变量 `VLLM_XLA_CACHE_PATH`，将缓存写入可共享存储，方便后续自动扩容节点直接复用。
 
-#### Reducing compilation time
+#### 如何减少编译时间
 
-This initial compilation time ranges significantly and is impacted by many of the arguments discussed in this optimization doc. Factors that influence the length of time to compile are things like model size and `--max-num-batch-tokens`. Other arguments you can tune are things like `VLLM_TPU_MOST_MODEL_LEN`.
+首次编译耗时受很多参数影响，本文档讨论的优化项都会有影响。编译时间与模型大小、`--max-num-batch-tokens` 等参数有关，你还可以调整如 `VLLM_TPU_MOST_MODEL_LEN` 等环境变量来优化。
 
-### Optimize based on your data
+### 针对你的数据进行优化
 
-#### max-model-len vs. most-model-len
+#### max-model-len 与 most-model-len 的结合
 
 ![most_model_len](../assets/design/tpu/most_model_len.png)
 
-If most of your requests are shorter than the maximum model length but you still need to accommodate occasional longer requests, setting a high maximum model length can negatively impact performance. In these cases, you can try introducing most-model-len by specifying the `VLLM_TPU_MOST_MODEL_LEN` environment variable.
+如果大部分请求长度远小于模型最大长度，但偶尔有较长请求需要处理，设置过高的最大长度会影响性能。此时可以通过环境变量 `VLLM_TPU_MOST_MODEL_LEN` 设置 most-model-len，实现更灵活的性能优化。
 
-For example, 1% requests are 32k length and 99% requests are 2k length. You can pass 32k into `--max-model-len 32768` and use `VLLM_TPU_MOST_MODEL_LEN=2048`.
+举例来说，假设 1% 的请求长度为 32k，99% 的请求为 2k。你可以将 `--max-model-len` 设为 32768，同时设置 `VLLM_TPU_MOST_MODEL_LEN=2048`。
 
-The requests get subdivided into max-model-len and most-model-len categories, for the latter category, you can gain better performance since the server can process more requests at a time.
+请求会被分为 max-model-len 和 most-model-len 两类，后者类别下服务器能同时处理更多请求，性能更好。
 
-#### Padding
+#### 填充策略
 
-For online serving with latency requirements, consider switching to bucket padding by setting the `VLLM_TPU_BUCKET_PADDING_GAP` environment variable. Because of the layout of the TPU, try using increments of 128 (e.g., 128, 256, etc.)
+如果你有在线推理和延迟要求，可以通过设置环境变量 `VLLM_TPU_BUCKET_PADDING_GAP` 切换为桶填充（bucket padding）。由于 TPU 的架构，建议使用 128 的倍数（比如 128、256 等）。
 
-The server pads the requests into fixed lengths before sending them to the model to avoid recompilation. To read more about TPU padding, see [here](https://cloud.google.com/tpu/docs/performance-guide#xla-efficiencies). Currently, there are 2 ways to pad the requests:
+服务器会在请求送入模型前，将其填充为固定长度，以避免再次编译。更多关于 TPU 填充的信息见[这里](https://cloud.google.com/tpu/docs/performance-guide#xla-efficiencies)。目前有两种填充方式：
 
-1. the default exponential padding (pad to the nearest power of 2)
-2. bucket padding (pad to the nearest linearly increasing bucket).
+1. 默认的指数填充（填充到最近的 2 的幂）
+2. 桶填充（填充到最近的线性递增桶）
 
-When using bucket padding, the buckets start from 16, end at max_model_len, and increment by `VLLM_TPU_BUCKET_PADDING_GAP`.
+使用桶填充时，桶从 16 起步，最大为 max_model_len，步长由 `VLLM_TPU_BUCKET_PADDING_GAP` 控制。
 
-For example, max_model_len=512, padding_gap=64, the buckets will be [16, 32, 64, 128, 192, 256, 320, 384, 448, 512].
+举例：max_model_len=512，padding_gap=64，桶为 [16, 32, 64, 128, 192, 256, 320, 384, 448, 512]。
 
-The fewer tokens you pad, the less unnecessary computation TPU does, the better performance you can get. For example, if num_tokens=300, with exponential padding, you pad to 512, with the bucket_padding above, you pad to 320.
+填充的 token 越少，TPU 的无效计算就越少，性能越好。例如，num_tokens=300，指数填充会补到 512，而按上述桶填充会补到 320。
 
-However, you need to be careful to choose the padding gap. If the gap is too small, it means the number of buckets is large, leading to increased warmup (precompile) time and higher memory to store the compiled graph. Too many compiled graphs may lead to HBM OOM. Conversely, an overly large gap yields no performance improvement compared to the default exponential padding.
+但要注意选择合适的填充步长。步长太小，桶数量太多，会增加预热（编译）时间且需要更多内存存储计算图，可能引发 HBM OOM；步长太大则和指数填充效果接近，性能提升有限。
 
-#### Quantization
+#### 量化（Quantization）
 
-If possible, use the precision that matches the chip’s hardware acceleration:
+如果可能，建议使用芯片硬件加速支持的精度：
 
-- v5e has int4/int8 hardware acceleration in the MXU
-- v6e has int4/int8 hardware acceleration in the MXU
+- v5e 的 MXU 支持 int4/int8 硬件加速
+- v6e 的 MXU 支持 int4/int8 硬件加速
 
-Supported quantized formats and features in vLLM on TPU [Jul '25]:
+vLLM 在 TPU 上已支持的量化格式及特性（截至 2025 年 7 月）：
 
 - INT8 W8A8
 - INT8 W8A16
-- FP8 KV cache
-- [WIP] FP8 W8A8
-- [WIP] AWQ
-- [WIP] FP4 W4A8
+- FP8 KV 缓存
+- [开发中] FP8 W8A8
+- [开发中] AWQ
+- [开发中] FP4 W4A8
 
-#### Parallelization
+#### 并行化
 
-Don't set TP to be less than the number of chips on a single-host deployment.
+在单主机部署时，TP 数量不要少于芯片数。
 
-Although it’s common to do this with GPUs, don't try to fragment 2 or 8 different workloads across 8 chips on a single host. If you need 1 or 4 chips, just create an instance with 1 or 4 chips (these are partial-host machine types).
+虽然在 GPU 上常见将多任务分布到多芯片，但在 TPU 上不要尝试在单主机的 8 个芯片上拆分 2 或 8 个不同任务。如果只需 1 或 4 个芯片，建议直接创建 1 或 4 芯片实例（属于部分主机类型）。
 
-### Tune your workloads
+### 调优你的任务
 
-Although we try to have great default configs, we strongly recommend you check out the [vLLM auto-tuner](../../benchmarks/auto_tune/README.md) to optimize your workloads for your use case.
+虽然我们提供了优秀的默认配置，但强烈建议你使用 [vLLM 自动调优工具](../../benchmarks/auto_tune/README.md) 来针对你的实际场景优化参数。
 
-### Future Topics We'll Cover
+### 后续将补充的话题
 
-#### Profiling
+#### 性能分析
 
-The auto-tuner provides a profile of optimized configurations as its final step. However, interpreting this profile can be challenging for new users. We plan to expand this section in the future with more detailed guidance. In the meantime, you can learn how to collect a TPU profile using vLLM's native profiling tools [here](../examples/offline_inference/profiling_tpu.md). This profile can provide valuable insights into your workload's performance.
+自动调优工具最终会生成一份优化配置的性能分析报告。不过对于新用户来说，解读这些分析结果可能有些困难。我们计划后续补充更详细的说明。你也可以先了解如何用 vLLM 原生工具收集 TPU 性能分析数据，参考[这里](../examples/offline_inference/profiling_tpu.md)。这些分析对你理解任务性能很有帮助。
 
 #### SPMD
 
-More details to come.
+更多内容敬请期待。
 
-**Want us to cover something that isn't listed here? Open up an issue please and cite this doc. We'd love to hear your questions or tips.**
+**有想了解但本文未涉及的内容吗？欢迎提交 issue 并引用本文档。我们非常乐意听取你的问题和建议！**

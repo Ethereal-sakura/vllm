@@ -1,48 +1,47 @@
-# Profiling vLLM
+# vLLM 性能分析指南
 
 !!! warning
-    Profiling is only intended for vLLM developers and maintainers to understand the proportion of time spent in different parts of the codebase. **vLLM end-users should never turn on profiling** as it will significantly slow down the inference.
+    性能分析（Profiling）仅适用于 vLLM 的开发者和维护者，用于了解代码库中各部分的耗时比例。**普通用户请勿开启性能分析功能**，因为它会极大降低推理速度。
 
-## Profile with PyTorch Profiler
+## 使用 PyTorch Profiler 进行分析
 
-We support tracing vLLM workers using the `torch.profiler` module. You can enable tracing by setting the `VLLM_TORCH_PROFILER_DIR` environment variable to the directory where you want to save the traces: `VLLM_TORCH_PROFILER_DIR=/mnt/traces/`. Additionally, you can control the profiling content by specifying the following environment variables:
+我们支持通过 `torch.profiler` 模块对 vLLM worker 进行追踪。只需设置环境变量 `VLLM_TORCH_PROFILER_DIR` 为你希望保存追踪数据的目录，例如：`VLLM_TORCH_PROFILER_DIR=/mnt/traces/`。你还可以通过以下环境变量进一步控制分析内容：
 
-- `VLLM_TORCH_PROFILER_RECORD_SHAPES=1` to enable recording Tensor Shapes, off by default
-- `VLLM_TORCH_PROFILER_WITH_PROFILE_MEMORY=1` to record memory, off by default
-- `VLLM_TORCH_PROFILER_WITH_STACK=1` to enable recording stack information, on by default
-- `VLLM_TORCH_PROFILER_WITH_FLOPS=1` to enable recording FLOPs, off by default
+- `VLLM_TORCH_PROFILER_RECORD_SHAPES=1`：记录张量形状，默认关闭
+- `VLLM_TORCH_PROFILER_WITH_PROFILE_MEMORY=1`：记录内存使用情况，默认关闭
+- `VLLM_TORCH_PROFILER_WITH_STACK=1`：记录堆栈信息，默认开启
+- `VLLM_TORCH_PROFILER_WITH_FLOPS=1`：记录 FLOPs（浮点运算量），默认关闭
 
-The OpenAI server also needs to be started with the `VLLM_TORCH_PROFILER_DIR` environment variable set.
+OpenAI 服务端也需要设置环境变量 `VLLM_TORCH_PROFILER_DIR`。
 
-When using `vllm bench serve`, you can enable profiling by passing the `--profile` flag.
+使用 `vllm bench serve` 命令时，添加 `--profile` 参数即可开启性能分析。
 
-Traces can be visualized using <https://ui.perfetto.dev/>.
-
-!!! tip
-    You can directly call bench module without installing vLLM using `python -m vllm.entrypoints.cli.main bench`.
+数据追踪结果可以通过 <https://ui.perfetto.dev/> 进行可视化。
 
 !!! tip
-    Only send a few requests through vLLM when profiling, as the traces can get quite large. Also, no need to untar the traces, they can be viewed directly.
+    你可以直接使用命令 `python -m vllm.entrypoints.cli.main bench` 调用 bench 模块，无需提前安装 vLLM。
 
 !!! tip
-    To stop the profiler - it flushes out all the profile trace files to the directory. This takes time, for example for about 100 requests worth of data for a llama 70b, it takes about 10 minutes to flush out on a H100.
-    Set the env variable VLLM_RPC_TIMEOUT to a big number before you start the server. Say something like 30 minutes.
+    分析时只需发送少量请求，否则追踪文件会很大。追踪文件无需解压，可以直接查看。
+
+!!! tip
+    停止 profiler 时，系统会将所有追踪数据写入目录，这可能需要较长时间。例如处理 100 个请求的数据，Llama 70b 在 H100 上写入大约需 10 分钟。建议在启动服务前设置 `VLLM_RPC_TIMEOUT` 环境变量为较大值，如 30 分钟：
     `export VLLM_RPC_TIMEOUT=1800000`
 
-### Example commands and usage
+### 命令示例及用法
 
-#### Offline Inference
+#### 离线推理
 
-Refer to [examples/offline_inference/simple_profiling.py](../../examples/offline_inference/simple_profiling.py) for an example.
+更多参考见 [examples/offline_inference/simple_profiling.py](../../examples/offline_inference/simple_profiling.py)。
 
-#### OpenAI Server
+#### OpenAI 服务端
 
 ```bash
 VLLM_TORCH_PROFILER_DIR=./vllm_profile \
     vllm serve meta-llama/Meta-Llama-3-70B
 ```
 
-vllm bench command:
+vllm bench 命令示例：
 
 ```bash
 vllm bench serve \
@@ -54,12 +53,11 @@ vllm bench serve \
     --num-prompts 2
 ```
 
-## Profile with NVIDIA Nsight Systems
+## 使用 NVIDIA Nsight Systems 进行分析
 
-Nsight systems is an advanced tool that exposes more profiling details, such as register and shared memory usage, annotated code regions and low-level CUDA APIs and events.
+Nsight Systems 是一款高级性能分析工具，可以展示寄存器和共享内存使用情况、代码注释区块、底层 CUDA API 和事件等详细信息。
 
-[Install nsight-systems](https://docs.nvidia.com/nsight-systems/InstallationGuide/index.html) using your package manager.
-The following block is an example for Ubuntu.
+[安装 nsight-systems](https://docs.nvidia.com/nsight-systems/InstallationGuide/index.html) 可使用包管理器。以下示例适用于 Ubuntu：
 
 ```bash
 apt update
@@ -70,15 +68,15 @@ apt update
 apt install nsight-systems-cli
 ```
 
-### Example commands and usage
+### 命令示例及用法
 
-When profiling with `nsys`, it is advisable to set the environment variable `VLLM_WORKER_MULTIPROC_METHOD=spawn`. The default is to use the `fork` method instead of `spawn`. More information on the topic can be found in the [Nsight Systems release notes](https://docs.nvidia.com/nsight-systems/ReleaseNotes/index.html#general-issues).
+使用 `nsys` 进行分析时，建议设置环境变量 `VLLM_WORKER_MULTIPROC_METHOD=spawn`。默认是 `fork`，但 `spawn` 更适合 Nsight。详细信息参考 [Nsight Systems 发布说明](https://docs.nvidia.com/nsight-systems/ReleaseNotes/index.html#general-issues)。
 
-#### Offline Inference
+#### 离线推理
 
-For basic usage, you can just append `nsys profile -o report.nsys-rep --trace-fork-before-exec=true --cuda-graph-trace=node` before any existing script you would run for offline inference.
+基本用法：在原有推理脚本前加上 `nsys profile -o report.nsys-rep --trace-fork-before-exec=true --cuda-graph-trace=node` 即可。
 
-The following is an example using the `vllm bench latency` script:
+以下为 `vllm bench latency` 脚本的示例：
 
 ```bash
 nsys profile -o report.nsys-rep \
@@ -93,12 +91,12 @@ vllm bench latency \
     --output-len 8
 ```
 
-#### OpenAI Server
+#### OpenAI 服务端
 
-To profile the server, you will want to prepend your `vllm serve` command with `nsys profile` just like for offline inference, however you must specify `--delay XX --duration YY` parameters according to the needs of your benchmark. After the duration time has been used up, the server will be killed.
+服务端分析时，也需在 `vllm serve` 命令前加上 `nsys profile`，并根据基准测试需求指定 `--delay XX --duration YY` 参数。达到指定持续时间后，服务器会自动关闭。
 
 ```bash
-# server
+# 服务端
 nsys profile -o report.nsys-rep \
     --trace-fork-before-exec=true \
     --cuda-graph-trace=node \
@@ -106,7 +104,7 @@ nsys profile -o report.nsys-rep \
     --duration 60 \
     vllm serve meta-llama/Llama-3.1-8B-Instruct
 
-# client
+# 客户端
 vllm bench serve \
     --backend vllm \
     --model meta-llama/Llama-3.1-8B-Instruct \
@@ -116,25 +114,25 @@ vllm bench serve \
     --random-output 512
 ```
 
-In practice, you should set the `--duration` argument to a large value. Whenever you want the server to stop profiling, run:
+实际使用时，建议将 `--duration` 设置为较大值。需要停止分析时，可运行：
 
 ```bash
 nsys sessions list
 ```
 
-to get the session id in the form of `profile-XXXXX`, then run:
+获取形如 `profile-XXXXX` 的 session id，然后运行：
 
 ```bash
 nsys stop --session=profile-XXXXX
 ```
 
-to manually kill the profiler and generate your `nsys-rep` report.
+即可手动终止 profiler，并生成 `nsys-rep` 报告。
 
-#### Analysis
+#### 分析方法
 
-You can view these profiles either as summaries in the CLI, using `nsys stats [profile-file]`, or in the GUI by installing Nsight [locally following the directions here](https://developer.nvidia.com/nsight-systems/get-started).
+你可以通过 CLI 查看概要信息（如 `nsys stats [profile-file]`），或按照[官方指引](https://developer.nvidia.com/nsight-systems/get-started)在本地安装 Nsight GUI 查看详细报告。
 
-??? console "CLI example"
+??? console "CLI 示例"
 
     ```bash
     nsys stats report1.nsys-rep
@@ -155,83 +153,74 @@ You can view these profiles either as summaries in the CLI, using `nsys stats [p
     ...
     ```
 
-GUI example:
+GUI 示例：
 
 <img width="1799" alt="Screenshot 2025-03-05 at 11 48 42 AM" src="https://github.com/user-attachments/assets/c7cff1ae-6d6f-477d-a342-bd13c4fc424c" />
 
-## Continuous Profiling
+## 持续性能分析
 
-There is a [GitHub CI workflow](https://github.com/pytorch/pytorch-integration-testing/actions/workflows/vllm-profiling.yml) in the PyTorch infrastructure repository that provides continuous profiling for different models on vLLM. This automated profiling helps track performance characteristics over time and across different model configurations.
+PyTorch 基础设施仓库的 [GitHub CI 工作流](https://github.com/pytorch/pytorch-integration-testing/actions/workflows/vllm-profiling.yml) 提供了对 vLLM 不同模型的持续性能分析。自动分析可以帮助跟踪不同模型及配置的性能变化和优化机会。
 
-### How It Works
+### 工作原理
 
-The workflow currently runs weekly profiling sessions for selected models, generating detailed performance traces that can be analyzed using different tools to identify performance regressions or optimization opportunities. But, it can be triggered manually as well, using the Github Action tool.
+该工作流目前会定期（每周）对选定模型进行性能分析，生成详尽的性能追踪数据，可用多种工具进行分析，便于发现性能回退或优化空间。你也可以手动通过 Github Action 触发分析流程。
 
-### Adding New Models
+### 添加新模型
 
-To extend the continuous profiling to additional models, you can modify the [profiling-tests.json](https://github.com/pytorch/pytorch-integration-testing/blob/main/vllm-profiling/cuda/profiling-tests.json) configuration file in the PyTorch integration testing repository. Simply add your model specifications to this file to include them in the automated profiling runs.
+如需添加其他模型参与持续性能分析，只需修改 PyTorch integration testing 仓库中的 [profiling-tests.json](https://github.com/pytorch/pytorch-integration-testing/blob/main/vllm-profiling/cuda/profiling-tests.json) 配置文件，将你的模型信息补充进去即可。
 
-### Viewing Profiling Results
+### 查看分析结果
 
-The profiling traces generated by the continuous profiling workflow are publicly available on the [vLLM Performance Dashboard](https://hud.pytorch.org/benchmark/llms?repoName=vllm-project%2Fvllm). Look for the **Profiling traces** table to access and download the traces for different models and runs.
+持续分析流程生成的追踪数据可在 [vLLM 性能仪表盘](https://hud.pytorch.org/benchmark/llms?repoName=vllm-project%2Fvllm) 公共访问。查找 **Profiling traces** 表格即可浏览并下载不同模型的分析数据。
 
-## Profiling vLLM Python Code
+## vLLM Python 代码性能分析
 
-The Python standard library includes
-[cProfile](https://docs.python.org/3/library/profile.html) for profiling Python
-code. vLLM includes a couple of helpers that make it easy to apply it to a section of vLLM.
-Both the `vllm.utils.profiling.cprofile` and `vllm.utils.profiling.cprofile_context` functions can be
-used to profile a section of code.
+Python 标准库自带 [cProfile](https://docs.python.org/3/library/profile.html) 性能分析工具。vLLM 提供了简便的辅助方法，可以直接应用于 vLLM 的代码区块分析。你可以用 `vllm.utils.profiling.cprofile` 或 `vllm.utils.profiling.cprofile_context` 对代码片段进行性能分析。
 
 !!! note
-    The legacy import paths `vllm.utils.cprofile` and `vllm.utils.cprofile_context` are deprecated.
-    Please use `vllm.utils.profiling.cprofile` and `vllm.utils.profiling.cprofile_context` instead.
+    过时的导入路径 `vllm.utils.cprofile` 和 `vllm.utils.cprofile_context` 已不推荐使用。
+    请改用 `vllm.utils.profiling.cprofile` 和 `vllm.utils.profiling.cprofile_context`。
 
-### Example usage - decorator
+### 用法示例 - 装饰器
 
-The first helper is a Python decorator that can be used to profile a function.
-If a filename is specified, the profile will be saved to that file. If no filename is
-specified, profile data will be printed to stdout.
+第一个辅助工具是 Python 装饰器，可以直接分析某个函数。如果指定了文件名，分析结果会保存至该文件，否则会直接输出到标准输出。
 
 ```python
 from vllm.utils.profiling import cprofile
 
 @cprofile("expensive_function.prof")
 def expensive_function():
-    # some expensive code
+    # 一些耗时的代码
     pass
 ```
 
-### Example Usage - context manager
+### 用法示例 - 上下文管理器
 
-The second helper is a context manager that can be used to profile a block of
-code. Similar to the decorator, the filename is optional.
+第二个辅助工具是上下文管理器，可以分析一段代码区块。和装饰器类似，文件名参数可选。
 
 ```python
 from vllm.utils.profiling import cprofile_context
 
 def another_function():
-    # more expensive code
+    # 更耗时的代码
     pass
 
 with cprofile_context("another_function.prof"):
     another_function()
 ```
 
-### Analyzing Profile Results
+### 分析结果
 
-There are multiple tools available that can help analyze the profile results.
-One example is [snakeviz](https://jiffyclub.github.io/snakeviz/).
+有多种工具可以帮助分析生成的性能报告。例如可以用 [snakeviz](https://jiffyclub.github.io/snakeviz/) 可视化分析结果：
 
 ```bash
 pip install snakeviz
 snakeviz expensive_function.prof
 ```
 
-### Analyzing Garbage Collection Costs
+### 分析垃圾回收（GC）开销
 
-Leverage VLLM_GC_DEBUG environment variable to debug GC costs.
+可通过环境变量 VLLM_GC_DEBUG 调试垃圾回收开销：
 
-- VLLM_GC_DEBUG=1: enable GC debugger with gc.collect elpased times
-- VLLM_GC_DEBUG='{"top_objects":5}': enable GC debugger to log top 5
-  collected objects for each gc.collect
+- VLLM_GC_DEBUG=1：启用 GC 调试器，记录每次 gc.collect 的耗时
+- VLLM_GC_DEBUG='{"top_objects":5}'：启用 GC 调试器，每次 gc.collect 时记录被回收最多的前 5 个对象

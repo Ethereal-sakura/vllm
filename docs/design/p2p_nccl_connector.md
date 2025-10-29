@@ -1,100 +1,100 @@
 # P2P NCCL Connector
 
-An implementation of xPyD with dynamic scaling based on point-to-point communication, partly inspired by Dynamo.
+一个基于点对点通信的 xPyD 动态扩缩容实现，部分灵感来自 Dynamo。
 
-## Detailed Design
+## 详细设计
 
-### Overall Process
+### 整体流程
 
-As shown in Figure 1, the overall process of this **PD disaggregation** solution is described through a request flow:
+如图 1 所示，本 **PD 反解耦** 方案的整体流程通过一次请求流转来描述：
 
-1. The client sends an HTTP request to the Proxy/Router's `/v1/completions` interface.
-2. The Proxy/Router selects a **1P1D (1 Prefill instance + 1 Decode instance)** through either through round-robin or random selection, generates a `request_id` (rules to be introduced later), modifies the `max_tokens` in the HTTP request message to **1**, and then forwards the request to the **P instance**.
-3. Immediately afterward, the Proxy/Router forwards the **original HTTP request** to the **D instance**.
-4. The **P instance** performs **Prefill** and then **actively sends the generated KV cache** to the D instance (using **PUT_ASYNC** mode). The D instance's `zmq_addr` can be resolved through the `request_id`.
-5. The **D instance** has a **dedicated thread** for receiving the KV cache (to avoid blocking the main process). The received KV cache is saved into the **GPU memory buffer**, the size of which is determined by the vLLM startup parameter `kv_buffer_size`. When the GPU buffer is full, the KV cache is stored in the **local Tensor memory pool**.
-6. During the **Decode**, the D instance's main process retrieves the KV cache (transmitted by the P instance) from either the **GPU buffer** or the **memory pool**, thereby **skipping Prefill**.
-7. After completing **Decode**, the D instance returns the result to the **Proxy/Router**, which then forwards it to the **client**.
+1. 客户端向 Proxy/Router 的 `/v1/completions` 接口发送 HTTP 请求。
+2. Proxy/Router 通过轮询或随机方式选择一个 **1P1D（1 个 Prefill 实例 + 1 个 Decode 实例）**，生成 `request_id`（生成规则后面会介绍），并将 HTTP 请求中的 `max_tokens` 字段修改为 **1**，然后转发给 **P 实例**。
+3. 紧接着，Proxy/Router 会将**原始 HTTP 请求**也转发给 **D 实例**。
+4. **P 实例**完成 **Prefill** 后，会**主动将生成的 KV 缓存**发送给 D 实例（采用 **PUT_ASYNC** 方式）。D 实例的 `zmq_addr` 可通过 `request_id` 解析获得。
+5. **D 实例**有一条**专用线程**用于接收 KV 缓存（防止主进程阻塞）。接收到的 KV 缓存会存入 **GPU 内存缓冲区**，缓冲区大小由 vLLM 启动参数 `kv_buffer_size` 决定。当 GPU 缓冲区满时，KV 缓存会被存到**本地 Tensor 内存池**。
+6. 在 **Decode** 阶段，D 实例主进程会从 **GPU 缓冲区**或**内存池**中获取 P 实例传来的 KV 缓存，从而**跳过 Prefill**。
+7. **Decode** 完成后，D 实例将结果返回给 **Proxy/Router**，再由 Proxy/Router 转发给 **客户端**。
 
 ![image1](https://github.com/user-attachments/assets/fb01bde6-755b-49f7-ad45-48a94b1e10a7)
 
-### Proxy/Router (Demo)
+### Proxy/Router（Demo）
 
-A simple HTTP service acts as the entry point for client requests and starts a background thread to listen for P/D instances reporting their HTTP IP and PORT, as well as ZMQ IP and PORT. It maintains a dictionary of `http_addr -> zmq_addr`. The `http_addr` is the IP:PORT for the vLLM instance's request, while the `zmq_addr` is the address for KV cache handshake and metadata reception.
+这是一个简单的 HTTP 服务，作为客户端请求的入口，并在后台启动线程监听 P/D 实例上报自己的 HTTP IP 和端口、ZMQ IP 和端口。它维护了一个 `http_addr -> zmq_addr` 的字典，其中 `http_addr` 是 vLLM 实例请求使用的 IP:PORT，`zmq_addr` 是进行 KV 缓存握手和元数据收发的地址。
 
-The Proxy/Router is responsible for selecting 1P1D based on the characteristics of the client request, such as the prompt, and generating a corresponding `request_id`, for example:
+Proxy/Router 会根据客户端请求特征（例如 prompt），选择 1P1D，并生成对应的 `request_id`，例如：
 
 ```text
 cmpl-___prefill_addr_10.0.1.2:21001___decode_addr_10.0.1.3:22001_93923d63113b4b338973f24d19d4bf11-0
 ```
 
-Currently, to quickly verify whether xPyD can work, a round-robin selection of 1P1D is used. In the future, it is planned to use a trie combined with the load status of instances to select appropriate P and D.
+目前为了快速验证 xPyD 能否跑通，选择 1P1D 时采用轮询。未来计划结合实例负载状态和前缀树方式，选择合适的 P 和 D。
 
-Each P/D instance periodically sends a heartbeat packet to the Proxy/Router (currently every 3 seconds) to register (i.e., report `http_addr -> zmq_addr`) and keep the connection alive. If an instance crashes and fails to send a ping for a certain period of time, the Proxy/Router will remove the timed-out instance (this feature has not yet been developed).
+每个 P/D 实例会定期（目前每 3 秒）向 Proxy/Router 发送心跳包进行注册（即上报 `http_addr -> zmq_addr`）并维持连接。如果某个实例崩溃并在一段时间内未发送心跳，Proxy/Router 会将该超时实例移除（此功能暂未开发）。
 
-### KV Cache Transfer Methods
+### KV 缓存传输方式
 
-There are three methods for KVCache transfer: PUT, GET, and PUT_ASYNC. These methods can be specified using the `--kv-transfer-config` and `kv_connector_extra_config` parameters, specifically through the `send_type` field. Both PUT and PUT_ASYNC involve the P instance actively sending KVCache to the D instance. The difference is that PUT is a synchronous transfer method that blocks the main process, while PUT_ASYNC is an asynchronous transfer method. PUT_ASYNC uses a dedicated thread for sending KVCache, which means it does not block the main process. In contrast, the GET method involves the P instance saving the KVCache to the memory buffer after computing the prefill. The D instance then actively retrieves the computed KVCache from the P instance once it has allocated space for the KVCache.
+KVCache 支持三种传输方式：PUT、GET 和 PUT_ASYNC。可以通过 `--kv-transfer-config` 和 `kv_connector_extra_config` 参数指定，具体通过 `send_type` 字段选择。PUT 和 PUT_ASYNC 都是 P 实例主动发送 KVCache 给 D 实例，区别在于 PUT 是同步传输，主进程会阻塞；PUT_ASYNC 是异步传输，通过专用线程发送，不会阻塞主进程。GET 方式下，P 实例将 Prefill 后的 KVCache 存入内存缓冲区，D 实例在分配好 KVCache 空间后主动从 P 实例拉取。
 
-Experimental results have shown that the performance of these methods, from highest to lowest, is as follows: PUT_ASYNC → GET → PUT.
+实验结果显示三种方式的性能从高到低依次为：PUT_ASYNC → GET → PUT。
 
-### P2P Communication via ZMQ & NCCL
+### ZMQ & NCCL 点对点通信
 
-As long as the address of the counterpart is known, point-to-point KV cache transfer (using NCCL) can be performed, without being constrained by rank and world size. To support dynamic scaling (expansion and contraction) of instances with PD disaggregation. This means that adding or removing P/D instances does not require a full system restart.
+只要知道对方地址，就能实现点对点（P2P）的 KV 缓存传输（通过 NCCL），不受 rank 和 world size 限制，支持 PD 解耦场景下的实例动态扩缩容。也就是说，增加或减少 P/D 实例无需全系统重启。
 
-Each P/D instance only needs to create a single `P2pNcclEngine` instance. This instance maintains a ZMQ Server, which runs a dedicated thread to listen on the `zmq_addr` address and receive control flow requests from other instances. These requests include requests to establish an NCCL connection and requests to send KVCache metadata (such as tensor shapes and data types). However, it does not actually transmit the KVCache data itself.
+每个 P/D 实例只需创建一个 `P2pNcclEngine` 实例。该实例会维护一个 ZMQ Server，专用线程监听 `zmq_addr`，接收来自其他实例的控制流请求——包括建立 NCCL 连接、发送 KVCache 元数据（如 tensor shape、dtype）等，但不负责实际的 KVCache 数据传输。
 
-When a P instance and a D instance transmit KVCache for the first time, they need to establish a ZMQ connection and an NCCL group. For subsequent KVCache transmissions, this ZMQ connection and NCCL group are reused. The NCCL group consists of only two ranks, meaning the world size is equal to 2. This design is intended to support dynamic scaling, which means that adding or removing P/D instances does not require a full system restart. As long as the address of the counterpart is known, point-to-point KVCache transmission can be performed, without being restricted by rank or world size.
+P 实例和 D 实例首次传输 KVCache 时，会建立一次 ZMQ 连接和 NCCL group。后续 KVCache 传输会复用这组连接。每个 NCCL group 仅包含两个 rank，即 world size = 2。这样的设计可支持动态扩缩容——只要知道对方地址，就能随时点对点发 KVCache，不受 rank/world size 限制，无需重启。
 
-### NCCL Group Topology
+### NCCL Group 拓扑结构
 
-Currently, only symmetric TP (Tensor Parallelism) methods are supported for KVCache transmission. Asymmetric TP and PP (Pipeline Parallelism) methods will be supported in the future. Figure 2 illustrates the 1P2D setup, where each instance has a TP (Tensor Parallelism) degree of 2. There are a total of 7 NCCL groups: three vLLM instances each have one NCCL group with TP=2. Additionally, the 0th GPU card of the P instance establishes an NCCL group with the 0th GPU card of each D instance. Similarly, the 1st GPU card of the P instance establishes an NCCL group with the 1st GPU card of each D instance.
+目前仅支持对称 TP（张量并行 Tensor Parallelism）下的 KVCache 传输，后续会支持非对称 TP 和 PP（流水线并行 Pipeline Parallelism）。如图 2 所示，1P2D 场景下，每个实例的 TP 度为 2，共有 7 个 NCCL group：三台 vLLM 实例各有一个 TP=2 的 NCCL group。此外，P 实例的第 0 块 GPU 与每个 D 实例的第 0 块 GPU 各建立一个 NCCL group，第 1 块 GPU 同理。
 
 ![image2](https://github.com/user-attachments/assets/837e61d6-365e-4cbf-8640-6dd7ab295b36)
 
-Each NCCL group occupies a certain amount of GPU memory buffer for communication, the size of which is primarily influenced by the `NCCL_MAX_NCHANNELS` environment variable. When `NCCL_MAX_NCHANNELS=16`, an NCCL group typically occupies 100MB, while when `NCCL_MAX_NCHANNELS=8`, it usually takes up 52MB. For large-scale xPyD configurations—such as DeepSeek's 96P144D—this implementation is currently not feasible. Moving forward, we are considering using RDMA for point-to-point communication and are also keeping an eye on UCCL.
+每个 NCCL group 都会占用一定的 GPU 内存缓冲区，大小主要受 `NCCL_MAX_NCHANNELS` 环境变量影响。比如 `NCCL_MAX_NCHANNELS=16` 时通常占用 100MB，`NCCL_MAX_NCHANNELS=8` 时一般占用 52MB。对于大规模 xPyD 配置（比如 DeepSeek 的 96P144D），目前实现还无法支持。后续计划采用 RDMA 实现点对点通信，也在关注 UCCL 方案。
 
-### GPU Memory Buffer and Tensor Memory Pool
+### GPU 内存缓冲区与 Tensor 内存池
 
-The trade-off in the size of the memory buffer is as follows: For P instances, the memory buffer is not required in PUT and PUT_ASYNC modes, but it is necessary in GET mode. For D instances, a memory buffer is needed in all three modes. The memory buffer for D instances should not be too large. Similarly, for P instances in GET mode, the memory buffer should also not be too large. The memory buffer of D instances is used to temporarily store KVCache sent by P instances. If it is too large, it will reduce the KVCache space available for normal inference by D instances, thereby decreasing the inference batch size and ultimately leading to a reduction in output throughput. The size of the memory buffer is configured by the parameter `kv_buffer_size`, measured in bytes, and is typically set to 5%～10% of the memory size.
+内存缓冲区大小的取舍如下：对于 P 实例，PUT 和 PUT_ASYNC 方式无需内存缓冲区，GET 方式需要。对于 D 实例，三种方式都需要内存缓冲区。D 实例的内存缓冲区不宜过大，P 实例在 GET 方式下内存缓冲区同理。D 实例的内存缓冲区用于暂存 P 实例发来的 KVCache，若设置过大，会挤占正常推理用的 KVCache 空间，降低推理批次，最终导致吞吐下降。内存缓冲区大小通过 `kv_buffer_size` 参数配置，单位为字节，通常设置为显存的 5%～10%。
 
-If the `--max-num-seqs` parameter for P instances is set to a large value, due to the large batch size, P instances will generate a large amount of KVCache simultaneously. This may exceed the capacity of the memory buffer of D instances, resulting in KVCache loss. Once KVCache is lost, D instances need to recompute Prefill, which is equivalent to performing Prefill twice. Consequently, the time-to-first-token (TTFT) will significantly increase, leading to degraded performance.
+如果 P 实例的 `--max-num-seqs` 参数设置过大，批次变大，会一次性产生大量 KVCache，可能超过 D 实例的内存缓冲区，导致 KVCache 丢失。KVCache 丢失后，D 实例需要重新 Prefill，相当于 Prefill 做了两次，TTFT（首次 token 延迟）急剧升高，性能恶化。
 
-To address the above issues, I have designed and developed a local Tensor memory pool for storing KVCache, inspired by the buddy system used in Linux memory modules. Since the memory is sufficiently large, typically in the TB range on servers, there is no need to consider prefix caching or using block-based designs to reuse memory, thereby saving space. When the memory buffer is insufficient, KVCache can be directly stored in the Tensor memory pool, and D instances can subsequently retrieve KVCache from it. The read and write speed is that of PCIe, with PCIe 4.0 having a speed of approximately 21 GB/s, which is usually faster than the Prefill speed. Otherwise, solutions like Mooncake and lmcache would not be necessary. The Tensor memory pool acts as a flood diversion area, typically unused except during sudden traffic surges. In the worst-case scenario, my solution performs no worse than the normal situation with a Cache store.
+为了解决上述问题，我设计并实现了本地 Tensor 内存池用于存放 KVCache，其思想借鉴了 Linux 内核中的 buddy 内存分配系统。由于服务器端内存通常足够大（TB 级），无需考虑前缀缓存、块复用等节省内存的设计。内存缓冲区不足时，KVCache 直接存入 Tensor 内存池，D 实例可随后从中读取，读写速度为 PCIe，PCIe 4.0 大约 21 GB/s，通常比 Prefill 速度快，否则 Mooncake、lmcache 这类方案也不会存在。Tensor 内存池相当于“泄洪区”，平时不用，只在突发流量时启用。最坏情况下，性能也不会比普通 Cache store 差。
 
-## Install vLLM
+## 安装 vLLM
 
 ```shell
 pip install "vllm>=0.9.2"
 ```
 
-## Run xPyD
+## 运行 xPyD
 
-### Instructions
+### 使用说明
 
-- The following examples are run on an A800 (80GB) device, using the Meta-Llama-3.1-8B-Instruct model.
-- Pay attention to the setting of the `kv_buffer_size` (in bytes). The empirical value is 10% of the GPU memory size. This is related to the kvcache size. If it is too small, the GPU memory buffer for temporarily storing the received kvcache will overflow, causing the kvcache to be stored in the tensor memory pool, which increases latency. If it is too large, the kvcache available for inference will be reduced, leading to a smaller batch size and decreased throughput.
-- For Prefill instances, when using non-GET mode, the `kv_buffer_size` can be set to 1, as Prefill currently does not need to receive kvcache. However, when using GET mode, a larger `kv_buffer_size` is required because it needs to store the kvcache sent to the D instance.
-- You may need to modify the `kv_buffer_size` and `port` in the following commands (if there is a conflict).
-- `PUT_ASYNC` offers the best performance and should be prioritized.
-- The `--port` must be consistent with the `http_port` in the `--kv-transfer-config`.
-- The `disagg_proxy_p2p_nccl_xpyd.py` script will use port 10001 (for receiving client requests) and port 30001 (for receiving service discovery from P and D instances).
-- The node running the proxy must have `quart` installed.
-- Supports multiple nodes; you just need to modify the `proxy_ip` and `proxy_port` in `--kv-transfer-config`.
-- In the following examples, it is assumed that **the proxy's IP is 10.0.1.1**.
+- 以下示例在 A800 (80GB) 设备上运行，使用 Meta-Llama-3.1-8B-Instruct 模型。
+- 请关注 `kv_buffer_size`（单位字节）的设置，经验值为显存的 10%。这个参数与 kvcache 大小有关，太小会导致临时存储 kvcache 的 GPU 缓冲区溢出，从而把 kvcache 存到 tensor 内存池，增加延迟；太大则会减少可用于推理的 kvcache 空间，批次变小，降低吞吐。
+- Prefill 实例在非 GET 方式下，`kv_buffer_size` 可设置为 1，因为 Prefill 当前不需要接收 kvcache；若使用 GET 方式，则需要较大 `kv_buffer_size`，因为要存储发往 D 实例的 kvcache。
+- 如有端口冲突，请自行调整下方命令中的 `kv_buffer_size` 和 `port`。
+- 建议优先选择性能最好的 `PUT_ASYNC` 方式。
+- `--port` 必须与 `--kv-transfer-config` 里的 `http_port` 保持一致。
+- `disagg_proxy_p2p_nccl_xpyd.py` 脚本会使用 10001 端口（接收客户端请求）和 30001 端口（接收 P/D 实例服务发现）。
+- 运行 proxy 的节点，需提前安装 `quart`。
+- 支持多节点，只需修改 `--kv-transfer-config` 里的 `proxy_ip` 和 `proxy_port`。
+- 以下示例默认 **proxy 的 IP 为 10.0.1.1**。
 
-### Run 1P3D
+### 运行 1P3D
 
-#### Proxy (e.g. 10.0.1.1)
+#### Proxy（如 10.0.1.1）
 
 ```shell
 cd {your vllm directory}/examples/online_serving/disaggregated_serving_p2p_nccl_xpyd/
 python3 disagg_proxy_p2p_nccl_xpyd.py &
 ```
 
-#### Prefill1 (e.g. 10.0.1.2 or 10.0.1.1)
+#### Prefill1（如 10.0.1.2 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=0 vllm serve {your model directory} \
@@ -113,9 +113,9 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         '{"kv_connector":"P2pNcclConnector","kv_role":"kv_producer","kv_buffer_size":"1e1","kv_port":"21001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20001"}}' > /var/vllm.log 2>&1 &
     ```
 
-#### Decode1 (e.g. 10.0.1.3 or 10.0.1.1)
+#### Decode1（如 10.0.1.3 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=1 vllm serve {your model directory} \
@@ -134,9 +134,9 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         '{"kv_connector":"P2pNcclConnector","kv_role":"kv_consumer","kv_buffer_size":"8e9","kv_port":"22001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20002"}}' > /var/vllm.log 2>&1 &
     ```
 
-#### Decode2 (e.g. 10.0.1.4 or 10.0.1.1)
+#### Decode2（如 10.0.1.4 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=2 vllm serve {your model directory} \
@@ -155,9 +155,9 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         '{"kv_connector":"P2pNcclConnector","kv_role":"kv_consumer","kv_buffer_size":"8e9","kv_port":"23001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20003"}}' > /var/vllm.log 2>&1 &
     ```
 
-#### Decode3 (e.g. 10.0.1.5 or 10.0.1.1)
+#### Decode3（如 10.0.1.5 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=3 vllm serve {your model directory} \
@@ -176,18 +176,18 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         '{"kv_connector":"P2pNcclConnector","kv_role":"kv_consumer","kv_buffer_size":"8e9","kv_port":"24001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20004"}}' > /var/vllm.log 2>&1 &
     ```
 
-### Run 3P1D
+### 运行 3P1D
 
-#### Proxy (e.g. 10.0.1.1)
+#### Proxy（如 10.0.1.1）
 
 ```shell
 cd {your vllm directory}/examples/online_serving/disaggregated_serving_p2p_nccl_xpyd/
 python3 disagg_proxy_p2p_nccl_xpyd.py &
 ```
 
-#### Prefill1 (e.g. 10.0.1.2 or 10.0.1.1)
+#### Prefill1（如 10.0.1.2 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=0 vllm serve {your model directory} \
@@ -206,9 +206,9 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         '{"kv_connector":"P2pNcclConnector","kv_role":"kv_producer","kv_buffer_size":"1e1","kv_port":"21001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20001"}}' > /var/vllm.log 2>&1 &
     ```
 
-#### Prefill2 (e.g. 10.0.1.3 or 10.0.1.1)
+#### Prefill2（如 10.0.1.3 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=1 vllm serve {your model directory} \
@@ -227,9 +227,9 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         '{"kv_connector":"P2pNcclConnector","kv_role":"kv_producer","kv_buffer_size":"1e1","kv_port":"22001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20002"}}' > /var/vllm.log 2>&1 &
     ```
 
-#### Prefill3 (e.g. 10.0.1.4 or 10.0.1.1)
+#### Prefill3（如 10.0.1.4 或 10.0.1.1）
 
-??? console "Command"
+??? console "命令"
 
     ```shell
     CUDA_VISIBLE_DEVICES=2 vllm serve {your model directory} \
@@ -239,81 +239,4 @@ python3 disagg_proxy_p2p_nccl_xpyd.py &
         --seed 1024 \
         --served-model-name base_model \
         --dtype float16 \
-        --max-model-len 10000 \
-        --max-num-batched-tokens 10000 \
-        --max-num-seqs 256 \
-        --trust-remote-code \
-        --gpu-memory-utilization 0.9 \
-        --kv-transfer-config \
-        '{"kv_connector":"P2pNcclConnector","kv_role":"kv_producer","kv_buffer_size":"1e1","kv_port":"23001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20003"}}' > /var/vllm.log 2>&1 &
-    ```
-
-#### Decode1 (e.g. 10.0.1.5 or 10.0.1.1)
-
-??? console "Command"
-
-    ```shell
-    CUDA_VISIBLE_DEVICES=3 vllm serve {your model directory} \
-        --host 0.0.0.0 \
-        --port 20004 \
-        --tensor-parallel-size 1 \
-        --seed 1024 \
-        --served-model-name base_model \
-        --dtype float16 \
-        --max-model-len 10000 \
-        --max-num-batched-tokens 10000 \
-        --max-num-seqs 256 \
-        --trust-remote-code \
-        --gpu-memory-utilization 0.7 \
-        --kv-transfer-config \
-        '{"kv_connector":"P2pNcclConnector","kv_role":"kv_consumer","kv_buffer_size":"8e9","kv_port":"24001","kv_connector_extra_config":{"proxy_ip":"10.0.1.1","proxy_port":"30001","http_port":"20004"}}' > /var/vllm.log 2>&1 &
-    ```
-
-## Single request
-
-```shell
-curl -X POST -s http://10.0.1.1:10001/v1/completions \
--H "Content-Type: application/json" \
--d '{
-    "model": "base_model",
-    "prompt": "San Francisco is a",
-    "max_tokens": 10,
-    "temperature": 0
-}'
-```
-
-## Benchmark
-
-??? console "Command"
-
-    ```shell
-    vllm bench serve \
-        --backend vllm \
-        --model base_model \
-        --tokenizer meta-llama/Llama-3.1-8B-Instruct \
-        --dataset-name "random" \
-        --host 10.0.1.1 \
-        --port 10001 \
-        --random-input-len 1024 \
-        --random-output-len 1024 \
-        --ignore-eos \
-        --burstiness 100 \
-        --percentile-metrics "ttft,tpot,itl,e2el" \
-        --metric-percentiles "90,95,99" \
-        --seed $(date +%s) \
-        --trust-remote-code \
-        --request-rate 3 \
-        --num-prompts 1000
-    ```
-
-## Shut down
-
-```shell
-pgrep python | xargs kill -9 && pkill -f python
-```
-
-## Test data
-
-### **Scenario**: 1K input & 200 output tokens, E2E P99 latency ~2s
-
-![testdata](https://github.com/user-attachments/assets/cef0953b-4567-4bf9-b940-405b92a28eb1)
+        --max-model

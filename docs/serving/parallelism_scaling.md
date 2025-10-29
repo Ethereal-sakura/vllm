@@ -1,38 +1,38 @@
-# Parallelism and Scaling
+# 并行化与扩展
 
-## Distributed inference strategies for a single-model replica
+## 单模型副本的分布式推理策略
 
-To choose a distributed inference strategy for a single-model replica, use the following guidelines:
+选择单模型副本的分布式推理策略时，可参考以下建议：
 
-- **Single GPU (no distributed inference):** if the model fits on a single GPU, distributed inference is probably unnecessary. Run inference on that GPU.
-- **Single-node multi-GPU using tensor parallel inference:** if the model is too large for a single GPU but fits on a single node with multiple GPUs, use *tensor parallelism*. For example, set `tensor_parallel_size=4` when using a node with 4 GPUs.
-- **Multi-node multi-GPU using tensor parallel and pipeline parallel inference:** if the model is too large for a single node, combine *tensor parallelism* with *pipeline parallelism*. Set `tensor_parallel_size` to the number of GPUs per node and `pipeline_parallel_size` to the number of nodes. For example, set `tensor_parallel_size=8` and `pipeline_parallel_size=2` when using 2 nodes with 8 GPUs per node.
+- **单 GPU（无分布式推理）：** 如果模型能够完全加载到一张 GPU 上，则无需使用分布式推理。直接在该 GPU 上运行推理即可。
+- **单节点多 GPU，使用张量并行推理：** 如果模型太大，单张 GPU 放不下，但在一台有多张 GPU 的节点上可以容纳，则可使用 *张量并行（tensor parallelism）*。例如，若节点有 4 张 GPU，设置 `tensor_parallel_size=4`。
+- **多节点多 GPU，结合张量并行和流水线并行推理：** 如果模型单节点也装不下，可以把 *张量并行* 和 *流水线并行（pipeline parallelism）* 结合起来。`tensor_parallel_size` 设为每个节点的 GPU 数，`pipeline_parallel_size` 设为节点数。例如，2 个节点，每节点 8 张 GPU，设置 `tensor_parallel_size=8`，`pipeline_parallel_size=2`。
 
-Increase the number of GPUs and nodes until there is enough GPU memory for the model. Set `tensor_parallel_size` to the number of GPUs per node and `pipeline_parallel_size` to the number of nodes.
+根据模型大小，逐步增加 GPU 和节点数，直到 GPU 显存足够容纳模型。`tensor_parallel_size` 设置为每节点 GPU 数，`pipeline_parallel_size` 设置为节点总数。
 
-After you provision sufficient resources to fit the model, run `vllm`. Look for log messages like:
+当资源分配足够后，运行 `vllm`，可在日志中看到类似如下信息：
 
 ```text
 INFO 07-23 13:56:04 [kv_cache_utils.py:775] GPU KV cache size: 643,232 tokens
 INFO 07-23 13:56:04 [kv_cache_utils.py:779] Maximum concurrency for 40,960 tokens per request: 15.70x
 ```
 
-The `GPU KV cache size` line reports the total number of tokens that can be stored in the GPU KV cache at once. The `Maximum concurrency` line provides an estimate of how many requests can be served concurrently if each request requires the specified number of tokens (40,960 in the example above). The tokens-per-request number is taken from the model configuration's maximum sequence length, `ModelConfig.max_model_len`. If these numbers are lower than your throughput requirements, add more GPUs or nodes to your cluster.
+`GPU KV cache size` 一行表示当前 GPU KV 缓存最多可存储的 token 数量。`Maximum concurrency` 则估算了当每次请求需要指定数量的 token（如上述例子为 40,960）时，最多可同时服务多少个请求。tokens-per-request 的数量取自模型配置里的最大序列长度 `ModelConfig.max_model_len`。如果这些数据低于你的吞吐需求，可以扩展更多 GPU 或节点。
 
-!!! note "Edge case: uneven GPU splits"
-    If the model fits within a single node but the GPU count doesn't evenly divide the model size, enable pipeline parallelism, which splits the model along layers and supports uneven splits. In this scenario, set `tensor_parallel_size=1` and `pipeline_parallel_size` to the number of GPUs. Furthermore, if the GPUs on the node do not have NVLINK interconnect (e.g. L40S), leverage pipeline parallelism instead of tensor parallelism for higher throughput and lower communication overhead.
+!!! note "特殊情况：GPU 分割不均"
+    如果模型可以放在单节点，但 GPU 数不能均匀分割模型，可以启用流水线并行（pipeline parallelism），它会按层切分模型，支持不均匀分割。这种情况下，将 `tensor_parallel_size` 设为 1，`pipeline_parallel_size` 设为 GPU 数量。此外，如果节点上的 GPU 没有 NVLINK 互联（例如 L40S），建议使用流水线并行而不是张量并行，以获得更高吞吐量和更低通信开销。
 
-### Distributed serving of *Mixture of Experts* (*MoE*) models
+### 分布式部署 *专家混合模型*（Mixture of Experts，MoE）
 
-It's often advantageous to exploit the inherent parallelism of experts by using a separate parallelism strategy for the expert layers. vLLM supports large-scale deployment combining Data Parallel attention with Expert or Tensor Parallel MoE layers. For more information, see [Data Parallel Deployment](data_parallel_deployment.md).
+在部署时，合理利用专家层（expert layers）的并行特性非常重要。vLLM 支持将数据并行注意力（Data Parallel attention）与专家或张量并行 MoE 层组合，实现大规模部署。详情请参考 [Data Parallel Deployment](data_parallel_deployment.md)。
 
-## Single-node deployment
+## 单节点部署
 
-vLLM supports distributed tensor-parallel and pipeline-parallel inference and serving. The implementation includes [Megatron-LM's tensor parallel algorithm](https://arxiv.org/pdf/1909.08053.pdf).
+vLLM 支持张量并行和流水线并行的分布式推理与服务。实现中包含了 [Megatron-LM 的张量并行算法](https://arxiv.org/pdf/1909.08053.pdf)。
 
-The default distributed runtimes are [Ray](https://github.com/ray-project/ray) for multi-node inference and native Python `multiprocessing` for single-node inference. You can override the defaults by setting `distributed_executor_backend` in the `LLM` class or `--distributed-executor-backend` in the API server. Use `mp` for `multiprocessing` or `ray` for Ray.
+默认的分布式运行时为多节点推理使用 [Ray](https://github.com/ray-project/ray)，单节点推理使用原生 Python 的 `multiprocessing`。你可以通过设置 `LLM` 类的 `distributed_executor_backend` 或 API 服务中的 `--distributed-executor-backend` 参数来切换默认执行器。`mp` 表示使用 `multiprocessing`，`ray` 表示使用 Ray。
 
-For multi-GPU inference, set `tensor_parallel_size` in the `LLM` class to the desired GPU count. For example, to run inference on 4 GPUs:
+多 GPU 推理时，在 `LLM` 类中设置 `tensor_parallel_size` 为所需 GPU 数。例如，使用 4 张 GPU 运行推理：
 
 ```python
 from vllm import LLM
@@ -40,41 +40,41 @@ llm = LLM("facebook/opt-13b", tensor_parallel_size=4)
 output = llm.generate("San Francisco is a")
 ```
 
-For multi-GPU serving, include `--tensor-parallel-size` when starting the server. For example, to run the API server on 4 GPUs:
+多 GPU 服务时，启动服务时添加 `--tensor-parallel-size` 参数。例如，API 服务运行在 4 张 GPU：
 
 ```bash
 vllm serve facebook/opt-13b \
      --tensor-parallel-size 4
 ```
 
-To enable pipeline parallelism, add `--pipeline-parallel-size`. For example, to run the API server on 8 GPUs with pipeline parallelism and tensor parallelism:
+如需启用流水线并行，可添加 `--pipeline-parallel-size` 参数。例如，API 服务在 8 张 GPU 上同时启用张量并行和流水线并行：
 
 ```bash
-# Eight GPUs total
+# 总计 8 张 GPU
 vllm serve gpt2 \
      --tensor-parallel-size 4 \
      --pipeline-parallel-size 2
 ```
 
-## Multi-node deployment
+## 多节点部署
 
-If a single node lacks sufficient GPUs to hold the model, deploy vLLM across multiple nodes. Ensure that every node provides an identical execution environment, including the model path and Python packages. Using container images is recommended because they provide a convenient way to keep environments consistent and to hide host heterogeneity.
+如果单节点 GPU 数不足以加载模型，可以将 vLLM 部署在多节点集群。务必确保每个节点的运行环境一致，包括模型路径和 Python 包。建议使用容器镜像，这样能方便地保持环境一致性并屏蔽宿主机差异。
 
-### What is Ray?
+### Ray 是什么？
 
-Ray is a distributed computing framework for scaling Python programs. Multi-node vLLM deployments require Ray as the runtime engine.
+Ray 是一个专为 Python 程序扩展而设计的分布式计算框架。多节点 vLLM 部署需要 Ray 作为运行引擎。
 
-vLLM uses Ray to manage the distributed execution of tasks across multiple nodes and control where execution happens.
+vLLM 通过 Ray 管理任务在各节点上的分布式执行，并灵活控制任务调度。
 
-Ray also offers high-level APIs for large-scale [offline batch inference](https://docs.ray.io/en/latest/data/working-with-llms.html) and [online serving](https://docs.ray.io/en/latest/serve/llm) that can leverage vLLM as the engine. These APIs add production-grade fault tolerance, scaling, and distributed observability to vLLM workloads.
+Ray 还提供了大规模 [离线批量推理](https://docs.ray.io/zh/latest/data/working-with-llms.html) 和 [在线服务](https://docs.ray.io/zh/latest/serve/llm) 的高级 API，这些 API 可直接调用 vLLM 作为底层引擎。它们为 vLLM 任务带来了生产级容错、自动扩展与分布式监控等能力。
 
-For details, see the [Ray documentation](https://docs.ray.io/en/latest/index.html).
+更多内容请查阅 [Ray 官方文档](https://docs.ray.io/zh/latest/index.html)。
 
-### Ray cluster setup with containers
+### 使用容器一键部署 Ray 集群
 
-The helper script [examples/online_serving/run_cluster.sh](../../examples/online_serving/run_cluster.sh) starts containers across nodes and initializes Ray. By default, the script runs Docker without administrative privileges, which prevents access to the GPU performance counters when profiling or tracing. To enable admin privileges, add the `--cap-add=CAP_SYS_ADMIN` flag to the Docker command.
+辅助脚本 [examples/online_serving/run_cluster.sh](../../examples/online_serving/run_cluster.sh) 可在多节点启动容器并初始化 Ray。默认情况下，该脚本运行 Docker 时没有管理员权限，这样在性能分析或追踪时无法访问 GPU 性能计数器。如需管理员权限，请在 Docker 命令中添加 `--cap-add=CAP_SYS_ADMIN` 参数。
 
-Choose one node as the head node and run:
+选择一个节点作为 head 节点，运行以下命令：
 
 ```bash
 bash run_cluster.sh \
@@ -85,7 +85,7 @@ bash run_cluster.sh \
                 -e VLLM_HOST_IP=<HEAD_NODE_IP>
 ```
 
-On each worker node, run:
+在每个 worker 节点上运行：
 
 ```bash
 bash run_cluster.sh \
@@ -96,24 +96,24 @@ bash run_cluster.sh \
                 -e VLLM_HOST_IP=<WORKER_NODE_IP>
 ```
 
-Note that `VLLM_HOST_IP` is unique for each worker. Keep the shells running these commands open; closing any shell terminates the cluster. Ensure that all nodes can communicate with each other through their IP addresses.
+注意，每个 worker 的 `VLLM_HOST_IP` 都需唯一。运行这些命令的 shell 需保持开启，任何一个 shell关闭都会导致集群停止。确保所有节点之间可以通过 IP 相互访问。
 
-!!! warning "Network security"
-    For security, set `VLLM_HOST_IP` to an address on a private network segment. Traffic sent over this network is unencrypted, and the endpoints exchange data in a format that can be exploited to execute arbitrary code if an adversary gains network access. Ensure that untrusted parties cannot reach the network.
+!!! warning "网络安全提醒"
+    为了安全起见，建议将 `VLLM_HOST_IP` 设为私有网段地址。该网络上的数据传输为明文，且端点间的数据格式可能被恶意利用从而执行任意代码。如果网络被攻击者访问，风险较高。务必保证不可信人员无法访问该网络。
 
-From any node, enter a container and run `ray status` and `ray list nodes` to verify that Ray finds the expected number of nodes and GPUs.
-
-!!! tip
-    Alternatively, set up the Ray cluster using KubeRay. For more information, see [KubeRay vLLM documentation](https://docs.ray.io/en/latest/cluster/kubernetes/examples/rayserve-llm-example.html).
-
-### Running vLLM on a Ray cluster
+在任意节点进入容器后，运行 `ray status` 和 `ray list nodes` 检查 Ray 是否识别了预期的节点和 GPU 数量。
 
 !!! tip
-    If Ray is running inside containers, run the commands in the remainder of this guide *inside the containers*, not on the host. To open a shell inside a container, connect to a node and use `docker exec -it <container_name> /bin/bash`.
+    你也可以通过 KubeRay 部署 Ray 集群。详细信息请参考 [KubeRay vLLM 文档](https://docs.ray.io/zh/latest/cluster/kubernetes/examples/rayserve-llm-example.html)。
 
-Once a Ray cluster is running, use vLLM as you would in a single-node setting. All resources across the Ray cluster are visible to vLLM, so a single `vllm` command on a single node is sufficient.
+### 在 Ray 集群上运行 vLLM
 
-The common practice is to set the tensor parallel size to the number of GPUs in each node, and the pipeline parallel size to the number of nodes. For example, if you have 16 GPUs across 2 nodes (8 GPUs per node), set the tensor parallel size to 8 and the pipeline parallel size to 2:
+!!! tip
+    如果 Ray 在容器内运行，后续所有命令都应在容器内执行而不是主机上。进入容器可通过 `docker exec -it <container_name> /bin/bash`。
+
+Ray 集群启动后，使用 vLLM 的方式与单节点类似。vLLM 会自动识别整个 Ray 集群中的所有资源，因此只需在任一节点执行一次 `vllm` 命令即可。
+
+通常做法是将张量并行规模设为每节点 GPU 数，流水线并行规模设为节点总数。例如，2 个节点共 16 张 GPU（每节点 8 张），则张量并行规模为 8，流水线并行规模为 2：
 
 ```bash
 vllm serve /path/to/the/model/in/the/container \
@@ -121,30 +121,30 @@ vllm serve /path/to/the/model/in/the/container \
     --pipeline-parallel-size 2
 ```
 
-Alternatively, you can set `tensor_parallel_size` to the total number of GPUs in the cluster:
+你也可以将 `tensor_parallel_size` 设置为整个集群总 GPU 数：
 
 ```bash
 vllm serve /path/to/the/model/in/the/container \
      --tensor-parallel-size 16
 ```
 
-## Optimizing network communication for tensor parallelism
+## 优化张量并行的网络通信
 
-Efficient tensor parallelism requires fast inter-node communication, preferably through high-speed network adapters such as InfiniBand.
-To set up the cluster to use InfiniBand, append additional arguments like `--privileged -e NCCL_IB_HCA=mlx5` to the
-[examples/online_serving/run_cluster.sh](../../examples/online_serving/run_cluster.sh) helper script.
-Contact your system administrator for more information about the required flags.
+高效的张量并行需要节点间高速网络通信，建议采用如 InfiniBand 等高性能网卡。
+如需配置集群使用 InfiniBand，可在
+[examples/online_serving/run_cluster.sh](../../examples/online_serving/run_cluster.sh) 辅助脚本中添加 `--privileged -e NCCL_IB_HCA=mlx5` 等参数。
+具体参数请联系你的系统管理员。
 
-## Enabling GPUDirect RDMA
+## 启用 GPUDirect RDMA
 
-GPUDirect RDMA (Remote Direct Memory Access) is an NVIDIA technology that allows network adapters to directly access GPU memory, bypassing the CPU and system memory. This direct access reduces latency and CPU overhead, which is beneficial for large data transfers between GPUs across nodes.
+GPUDirect RDMA（远程直接内存访问，Remote Direct Memory Access）是 NVIDIA 推出的技术，允许网卡直接访问 GPU 显存，无需经过 CPU 和系统内存。这种直接访问可降低延迟和 CPU 占用，对于节点间大数据量的 GPU 互传非常有益。
 
-To enable GPUDirect RDMA with vLLM, configure the following settings:
+如需在 vLLM 中启用 GPUDirect RDMA，需配置如下：
 
-- `IPC_LOCK` security context: add the `IPC_LOCK` capability to the container's security context to lock memory pages and prevent swapping to disk.
-- Shared memory with `/dev/shm`: mount `/dev/shm` in the pod spec to provide shared memory for interprocess communication (IPC).
+- `IPC_LOCK` 安全上下文：为容器添加 `IPC_LOCK` 权限，以锁定内存页面防止被换出到磁盘。
+- 挂载 `/dev/shm` 共享内存：在 pod 配置中挂载 `/dev/shm`，用于进程间通信（IPC）共享内存。
 
-If you use Docker, set up the container as follows:
+若使用 Docker，可按如下方式启动容器：
 
 ```bash
 docker run --gpus all \
@@ -154,7 +154,7 @@ docker run --gpus all \
     vllm/vllm-openai
 ```
 
-If you use Kubernetes, set up the pod spec as follows:
+若使用 Kubernetes，可按如下方式配置 pod：
 
 ```yaml
 ...
@@ -180,17 +180,17 @@ spec:
 ...
 ```
 
-!!! tip "Confirm GPUDirect RDMA operation"
-    To confirm your InfiniBand card is using GPUDirect RDMA, run vLLM with detailed NCCL logs: `NCCL_DEBUG=TRACE vllm serve ...`.
+!!! tip "如何确认 GPUDirect RDMA 工作状态"
+    想确认你的 InfiniBand 网卡是否启用 GPUDirect RDMA，可用详细 NCCL 日志运行 vLLM：`NCCL_DEBUG=TRACE vllm serve ...`
 
-    Then look for the NCCL version and the network used.
+    日志会显示 NCCL 版本和实际使用的网络类型。
 
-    - If you find `[send] via NET/IB/GDRDMA` in the logs, then NCCL is using InfiniBand with GPUDirect RDMA, which *is* efficient.
-    - If you find `[send] via NET/Socket` in the logs, NCCL used a raw TCP socket, which *is not* efficient for cross-node tensor parallelism. 
+    - 若日志中出现 `[send] via NET/IB/GDRDMA`，说明 NCCL 正在用 InfiniBand + GPUDirect RDMA，效率较高。
+    - 若出现 `[send] via NET/Socket`，说明 NCCL 用的是普通 TCP socket，跨节点张量并行效率较低。
 
-!!! tip "Pre-download Hugging Face models"
-    If you use Hugging Face models, downloading the model before starting vLLM is recommended. Download the model on every node to the same path, or store the model on a distributed file system accessible by all nodes. Then pass the path to the model in place of the repository ID. Otherwise, supply a Hugging Face token by appending `-e HF_TOKEN=<TOKEN>` to `run_cluster.sh`.
+!!! tip "提前下载 Hugging Face 模型"
+    如果使用 Hugging Face 模型，建议提前下载模型。可在每个节点下载到相同路径，或统一存放在全节点可访问的分布式文件系统。启动 vLLM 时传递模型路径即可，无需 repo id。否则，也可通过在 `run_cluster.sh` 后追加 `-e HF_TOKEN=<TOKEN>` 传递 Hugging Face token。
 
-## Troubleshooting distributed deployments
+## 分布式部署故障排查
 
-For information about distributed debugging, see [Troubleshooting distributed deployments](distributed_troubleshooting.md).
+分布式调试相关信息请参考 [分布式部署故障排查](distributed_troubleshooting.md)。

@@ -1,14 +1,14 @@
 # LangChain
 
-vLLM is also available via [LangChain](https://github.com/langchain-ai/langchain) .
+vLLM 也可以通过 [LangChain](https://github.com/langchain-ai/langchain) 使用
 
-To install LangChain, run
+要安装 LangChain，请运行以下命令
 
 ```bash
 pip install langchain langchain_community -q
 ```
 
-To run inference on a single or multiple GPUs, use `VLLM` class from `langchain`.
+如果你想在单个或多个 GPU 上进行推理，可以使用 `langchain` 中的 `VLLM` 类。
 
 ??? code
 
@@ -17,16 +17,16 @@ To run inference on a single or multiple GPUs, use `VLLM` class from `langchain`
 
     llm = VLLM(
         model="mosaicml/mpt-7b",
-        trust_remote_code=True,  # mandatory for hf models
+        trust_remote_code=True,  # 对于 huggingface 模型这是必须的
         max_new_tokens=128,
         top_k=10,
         top_p=0.95,
         temperature=0.8,
-        # for distributed inference
+        # 分布式推理时使用
         # tensor_parallel_size=...,
     )
 
     print(llm("What is the capital of France ?"))
     ```
 
-Please refer to this [Tutorial](https://python.langchain.com/docs/integrations/llms/vllm) for more details.
+更多详细信息，请参考这个 [教程](https://python.langchain.com/docs/integrations/llms/vllm)

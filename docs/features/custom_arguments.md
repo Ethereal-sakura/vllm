@@ -1,22 +1,22 @@
-# Custom Arguments
+# 自定义参数
 
-You can use vLLM *custom arguments* to pass in arguments which are not part of the vLLM `SamplingParams` and REST API specifications. Adding or removing a vLLM custom argument does not require recompiling vLLM, since the custom arguments are passed in as a dictionary.
+你可以使用 vLLM 的*自定义参数（custom arguments）*，为 vLLM 传递那些不属于 vLLM `SamplingParams` 和 REST API 规范的参数。添加或删除 vLLM 自定义参数时，无需重新编译 vLLM，因为这些自定义参数以字典的形式传递。
 
-Custom arguments can be useful if, for example, you want to use a [custom logits processor](./custom_logitsprocs.md) without modifying the vLLM source code.
+自定义参数非常适合在不修改 vLLM 源码的情况下，比如你想使用[自定义 logits 处理器（custom logits processor）](./custom_logitsprocs.md)时使用。
 
-## Offline Custom Arguments
+## 离线自定义参数
 
-Custom arguments passed to `SamplingParams.extra_args` as a `dict` will be visible to any code which has access to `SamplingParams`:
+通过 `SamplingParams.extra_args` 以 `dict` 形式传递的自定义参数，对所有能访问到 `SamplingParams` 的代码都是可见的：
 
 ``` python
 SamplingParams(extra_args={"your_custom_arg_name": 67})
 ```
 
-This allows arguments which are not already part of `SamplingParams` to be passed into `LLM` as part of a request.
+这样，你就可以把那些不属于 `SamplingParams` 的参数，作为请求的一部分传递给 `LLM`。
 
-## Online Custom Arguments
+## 在线自定义参数
 
-The vLLM REST API allows custom arguments to be passed to the vLLM server via `vllm_xargs`. The example below integrates custom arguments into a vLLM REST API request:
+vLLM 的 REST API 支持通过 `vllm_xargs` 向 vLLM 服务器传递自定义参数。下面的例子展示了如何在 vLLM REST API 请求中集成自定义参数：
 
 ``` bash
 curl http://localhost:8000/v1/completions \
@@ -28,7 +28,7 @@ curl http://localhost:8000/v1/completions \
     }'
 ```
 
-Furthermore, OpenAI SDK users can access `vllm_xargs` via the `extra_body` argument:
+此外，使用 OpenAI SDK 时，也可以通过 `extra_body` 参数访问 `vllm_xargs`：
 
 ``` python
 batch = await client.completions.create(
@@ -43,4 +43,4 @@ batch = await client.completions.create(
 ```
 
 !!! note
-    `vllm_xargs` is assigned to `SamplingParams.extra_args` under the hood, so code which uses `SamplingParams.extra_args` is compatible with both offline and online scenarios.
+    `vllm_xargs` 实际上会被赋值给 `SamplingParams.extra_args`，因此只要你的代码用的是 `SamplingParams.extra_args`，就可以同时兼容离线和在线两种场景。

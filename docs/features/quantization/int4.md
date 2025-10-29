@@ -1,38 +1,38 @@
 # INT4 W4A16
 
-vLLM supports quantizing weights to INT4 for memory savings and inference acceleration. This quantization method is particularly useful for reducing model size and maintaining low latency in workloads with low queries per second (QPS).
+vLLM 支持将权重量化为 INT4（4 位整型），可以显著节省内存并加速推理。这种量化方法非常适用于低查询每秒（QPS）场景，可以有效减小模型体积，同时保持低延迟。
 
-Please visit the HF collection of [quantized INT4 checkpoints of popular LLMs ready to use with vLLM](https://huggingface.co/collections/neuralmagic/int4-llms-for-vllm-668ec34bf3c9fa45f857df2c).
+欢迎访问 HF 上的 [适用于 vLLM 的主流大模型 INT4 量化模型集合](https://huggingface.co/collections/neuralmagic/int4-llms-for-vllm-668ec34bf3c9fa45f857df2c) 
 
 !!! note
-    INT4 computation is supported on NVIDIA GPUs with compute capability > 8.0 (Ampere, Ada Lovelace, Hopper, Blackwell).
+    INT4 计算仅在 NVIDIA GPU 计算能力 > 8.0（Ampere、Ada Lovelace、Hopper、Blackwell）上支持。
 
-## Prerequisites
+## 使用前准备
 
-To use INT4 quantization with vLLM, you'll need to install the [llm-compressor](https://github.com/vllm-project/llm-compressor/) library:
+要在 vLLM 中使用 INT4 量化功能，需先安装 [llm-compressor](https://github.com/vllm-project/llm-compressor/) 库：
 
 ```bash
 pip install llmcompressor
 ```
 
-Additionally, install `vllm` and `lm-evaluation-harness` for evaluation:
+此外，为了评估模型，还需要安装 `vllm` 和 `lm-evaluation-harness`：
 
 ```bash
 pip install vllm git+https://github.com/EleutherAI/lm-evaluation-harness.git@206b7722158f58c35b7ffcd53b035fdbdda5126d#egg=lm-eval[api]
 ```
 
-## Quantization Process
+## 量化流程
 
-The quantization process involves four main steps:
+量化过程主要分为四个步骤：
 
-1. Loading the model
-2. Preparing calibration data
-3. Applying quantization
-4. Evaluating accuracy in vLLM
+1. 加载模型
+2. 准备校准数据
+3. 执行量化
+4. 在 vLLM 中评估精度
 
-### 1. Loading the Model
+### 1. 加载模型
 
-Load your model and tokenizer using the standard `transformers` AutoModel classes:
+使用标准的 `transformers` AutoModel 类加载你的模型和分词器：
 
 ```python
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -46,11 +46,10 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 ```
 
-### 2. Preparing Calibration Data
+### 2. 准备校准数据
 
-When quantizing weights to INT4, you need sample data to estimate the weight updates and calibrated scales.
-It's best to use calibration data that closely matches your deployment data.
-For a general-purpose instruction-tuned model, you can use a dataset like `ultrachat`:
+在进行 INT4 权重量化时，需要使用样本数据来估算权重更新和校准比例。建议选用与实际部署场景相似的数据进行校准。
+对于通用指令微调模型，可以选择如 `ultrachat` 这类数据集：
 
 ??? code
 
@@ -60,7 +59,7 @@ For a general-purpose instruction-tuned model, you can use a dataset like `ultra
     NUM_CALIBRATION_SAMPLES = 512
     MAX_SEQUENCE_LENGTH = 2048
 
-    # Load and preprocess the dataset
+    # 加载并预处理数据集
     ds = load_dataset("HuggingFaceH4/ultrachat_200k", split="train_sft")
     ds = ds.shuffle(seed=42).select(range(NUM_CALIBRATION_SAMPLES))
 
@@ -73,9 +72,9 @@ For a general-purpose instruction-tuned model, you can use a dataset like `ultra
     ds = ds.map(tokenize, remove_columns=ds.column_names)
     ```
 
-### 3. Applying Quantization
+### 3. 执行量化
 
-Now, apply the quantization algorithms:
+现在可以开始使用量化算法对模型进行处理：
 
 ??? code
 
@@ -84,10 +83,10 @@ Now, apply the quantization algorithms:
     from llmcompressor.modifiers.quantization import GPTQModifier
     from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
 
-    # Configure the quantization algorithms
+    # 配置量化算法
     recipe = GPTQModifier(targets="Linear", scheme="W4A16", ignore=["lm_head"])
 
-    # Apply quantization
+    # 执行量化
     oneshot(
         model=model,
         dataset=ds,
@@ -96,17 +95,17 @@ Now, apply the quantization algorithms:
         num_calibration_samples=NUM_CALIBRATION_SAMPLES,
     )
 
-    # Save the compressed model: Meta-Llama-3-8B-Instruct-W4A16-G128
+    # 保存压缩后的模型，如 Meta-Llama-3-8B-Instruct-W4A16-G128
     SAVE_DIR = MODEL_ID.split("/")[1] + "-W4A16-G128"
     model.save_pretrained(SAVE_DIR, save_compressed=True)
     tokenizer.save_pretrained(SAVE_DIR)
     ```
 
-This process creates a W4A16 model with weights quantized to 4-bit integers.
+执行完以上流程后，将得到一个权重已量化为 4 位整型的 W4A16 模型。
 
-### 4. Evaluating Accuracy
+### 4. 精度评估
 
-After quantization, you can load and run the model in vLLM:
+量化后，可以在 vLLM 中加载和运行模型：
 
 ```python
 from vllm import LLM
@@ -114,7 +113,7 @@ from vllm import LLM
 llm = LLM("./Meta-Llama-3-8B-Instruct-W4A16-G128")
 ```
 
-To evaluate accuracy, you can use `lm_eval`:
+模型评估可通过 `lm_eval` 工具进行：
 
 ```bash
 lm_eval --model vllm \
@@ -126,20 +125,20 @@ lm_eval --model vllm \
 ```
 
 !!! note
-    Quantized models can be sensitive to the presence of the `bos` token. Make sure to include the `add_bos_token=True` argument when running evaluations.
+    量化模型对 `bos` token 的有无较为敏感。评估时请务必添加 `add_bos_token=True` 参数。
 
-## Best Practices
+## 最佳实践
 
-- Start with 512 samples for calibration data, and increase if accuracy drops
-- Ensure the calibration data contains a high variety of samples to prevent overfitting towards a specific use case
-- Use a sequence length of 2048 as a starting point
-- Employ the chat template or instruction template that the model was trained with
-- If you've fine-tuned a model, consider using a sample of your training data for calibration
-- Tune key hyperparameters to the quantization algorithm:
-    - `dampening_frac` sets how much influence the GPTQ algorithm has. Lower values can improve accuracy, but can lead to numerical instabilities that cause the algorithm to fail.
-    - `actorder` sets the activation ordering. When compressing the weights of a layer weight, the order in which channels are quantized matters. Setting `actorder="weight"` can improve accuracy without added latency.
+- 校准数据建议从 512 条样本开始，若精度不理想可适当增加
+- 选择样本多样性高的校准数据，避免模型只适用于某一特定场景
+- 推荐初始序列长度为 2048
+- 使用模型训练时相同的对话模板或指令模板
+- 如有微调过的模型，可直接选用训练集中的部分样本做校准
+- 针对量化算法调优关键超参数：
+    - `dampening_frac` 控制 GPTQ 算法的影响力。数值较低可以提升精度，但可能导致数值不稳定，算法运行失败。
+    - `actorder` 控制激活顺序。对权重量化时，通道的量化顺序很重要。设置 `actorder="weight"` 可以提升精度且不会增加延迟。
 
-The following is an example of an expanded quantization recipe you can tune to your own use case:
+下面是一个可供自定义调优的量化 recipe 示例：
 
 ??? code
 
@@ -172,6 +171,6 @@ The following is an example of an expanded quantization recipe you can tune to y
     )
     ```
 
-## Troubleshooting and Support
+## 常见问题与支持
 
-If you encounter any issues or have feature requests, please open an issue on the [vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor/issues) GitHub repository. The full INT4 quantization example in `llm-compressor` is available [here](https://github.com/vllm-project/llm-compressor/blob/main/examples/quantization_w4a16/llama3_example.py).
+如果遇到问题或有功能需求，欢迎在 [vllm-project/llm-compressor](https://github.com/vllm-project/llm-compressor/issues) GitHub 仓库提交 issue。完整 INT4 量化示例代码可在 [此处](https://github.com/vllm-project/llm-compressor/blob/main/examples/quantization_w4a16/llama3_example.py) 获取。

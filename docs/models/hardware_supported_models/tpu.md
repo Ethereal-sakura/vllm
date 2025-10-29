@@ -1,10 +1,10 @@
 # TPU
 
-## Supported Models
+## 支持的模型
 
-### Text-only Language Models
+### 纯文本大语言模型
 
-| Model                                               | Architecture                   | Supported |
+| 模型                                               | 架构                            | 支持情况  |
 |-----------------------------------------------------|--------------------------------|-----------|
 | mistralai/Mixtral-8x7B-Instruct-v0.1                | MixtralForCausalLM             | 🟨 |
 | mistralai/Mistral-Small-24B-Instruct-2501           | MistralForCausalLM             | ✅ |
@@ -29,6 +29,6 @@
 | Qwen/Qwen2.5-14B-Instruct                           | Qwen2ForCausalLM               | ✅ |
 | Qwen/Qwen2.5-1.5B-Instruct                          | Qwen2ForCausalLM               | 🟨 |
 
-✅ Runs and optimized.  
-🟨 Runs and correct but not optimized to green yet.  
-❌ Does not pass accuracy test or does not run.  
+✅ 已运行并完成优化  
+🟨 已运行且结果正确，但还未优化到绿色  
+❌ 未通过准确率测试或无法运行  

@@ -1,22 +1,22 @@
-# Fused MoE Kernel features
+# Fused MoE Kernel 特性
 
-The purpose of this document is to provide an overview of the various MoE kernels (both modular and non-modular) so it will be easier to select an appropriate set of kernels for any particular situation. This includes information about the all2all backends used by modular kernels.
+本文档旨在为不同类型的 MoE（专家混合，Mixture of Experts）核（包括模块化和非模块化）提供一个全面的概览，帮助你根据实际需求更容易地选择合适的内核。同时，也介绍了模块化核所用到的 all2all 通信后端。
 
-## Fused MoE Modular All2All backends
+## Fused MoE 模块化 All2All 通信后端
 
-There are a number of all2all communication backends that are used to implement expert parallelism (EP) for the `FusedMoE` layer. The different `FusedMoEPrepareAndFinalize` sub-classes provide an interface for each all2all backend.
+在 `FusedMoE` 层中，实现专家并行（Expert Parallelism, EP）时可选用多种 all2all 通信后端。每种 all2all 后端都通过不同的 `FusedMoEPrepareAndFinalize` 子类进行对接。
 
-The following table describes the relevant features of each backend, i.e. activation format, supported quantization schemes and async support.
+下表对每种后端的关键特性进行了说明，包括激活格式、支持的量化方案以及是否支持异步。
 
-The output activation format (standard or batched) corresponds to the output of the prepare step of the `FusedMoEPrepareAndFinalize` subclass, the finalize step requires the same format. All the backend `prepare` methods expect activations in standard format and all the `finalize methods return activations in standard format. More details on the formats can be found in the [Fused MoE Modular Kernel](./fused_moe_modular_kernel.md) document.
+输出激活格式（standard 或 batched）对应 `FusedMoEPrepareAndFinalize` 子类的 prepare 步骤输出，finalize 步骤则要求相同格式。所有后端的 `prepare` 方法都要求 standard 格式输入，所有 `finalize` 方法会输出 standard 格式。关于格式的更多细节，可以参考 [Fused MoE Modular Kernel](./fused_moe_modular_kernel.md) 文档。
 
-The quantization types and formats enumerate which quantization schemes are supported by each `FusedMoEPrepareAndFinalize` class. The quantization can happen before or after the dispatch based on the format the all2all backend supports. e.g. deepep_high_throughput supports only block-quantized fp8 format, any other format will result in dispatching in higher precision and quantizing afterwards. The output of the prepare step for each backend is the quantized type.  The finalize step generally requires the same input type as the original activations, e.g. if the original input is bfloat16 and the quantization scheme is fp8 w/per-tensor scales, `prepare` will return fp8/per-tensor scale activations and `finalize` will take bfloat16 activations. See the diagrams in [Fused MoE Modular Kernel](./fused_moe_modular_kernel.md) for more details on the types and formats of activations at each step of the MoE process.  If no quantization type is specified, the kernel operates on float16 and/or bfloat16.
+量化类型与格式列出每个 `FusedMoEPrepareAndFinalize` 类支持的量化方案。量化步骤可以发生在分派前或分派后，具体取决于后端支持的格式。例如，deepep_high_throughput 只支持块量化的 fp8 格式，其它格式会在分派后以更高精度进行量化。每个后端的 prepare 步骤输出都是量化后的类型，finalize 步骤通常要求输入与原始激活类型相同，例如原始输入为 bfloat16 且量化方案为 fp8 配合 per-tensor scales，那么 prepare 返回 fp8/per-tensor scale 激活，finalize 则接收 bfloat16 激活。更多不同步骤激活类型与格式的示意，请参考 [Fused MoE Modular Kernel](./fused_moe_modular_kernel.md) 文档。如果未指定量化类型，内核默认使用 float16 或 bfloat16。
 
-Async backends support the use of DBO (Dual Batch Overlap) and shared expert overlap (where shared experts are computed during the combine step).
+异步后端支持 DBO（Dual Batch Overlap，双批次重叠）和专家共享重叠（即在 combine 阶段进行 shared experts 计算）。
 
-Certain models require the topk weights to be applied to the input activations rather than the output activations when topk==1, e.g. llama. For modular kernels, this feature is supported by the `FusedMoEPrepareAndFinalize` subclass, for non-modular kernels, it is up to the experts function to deal with this flag.
+部分模型在 topk==1 时（如 llama），需要在输入激活上应用 topk 权重，而不是输出激活。对于模块化核，由 `FusedMoEPrepareAndFinalize` 子类支持此功能；对于非模块化核，则需要专家函数自行处理此标志。
 
-unless otherwise specified, backends are controlled via `VLLM_ALL2ALL_BACKEND`.  All backends except `flashinfer` only work with EP+DP or EP+TP. `Flashinfer` can work with EP or DP w/o EP.
+除非特别说明，后端通过 `VLLM_ALL2ALL_BACKEND` 控制。除 `flashinfer` 外，所有后端仅支持 EP+DP 或 EP+TP 组合。`Flashinfer` 则可用于 EP 或纯 DP。
 
 <style>
 td {
@@ -42,22 +42,22 @@ th {
 | MoEPrepareAndFinalizeNoEP<sup>5</sup> | standard           | fp8,int8        | G,A,T                  | N     | Y                     | [`MoEPrepareAndFinalizeNoEP`][vllm.model_executor.layers.fused_moe.prepare_finalize.MoEPrepareAndFinalizeNoEP]                                                |
 | BatchedPrepareAndFinalize<sup>5</sup> | batched            | fp8,int8        | G,A,T                  | N     | Y                     | [`BatchedPrepareAndFinalize`][vllm.model_executor.layers.fused_moe.fused_batched_moe.BatchedPrepareAndFinalize]                                               |
 
-!!! info "Table key"
-    1. All types: mxfp4, nvfp4, int4, int8, fp8
-    2. A,T quantization occurs after dispatch.
-    3. All quantization happens after dispatch.
-    4. Controlled by different env vars (`VLLM_FLASHINFER_MOE_BACKEND` "throughput" or "latency")
-    5. This is a no-op dispatcher that can be used to pair with any modular experts to produce a modular kernel that runs w/o dispatch or combine.  These cannot be selected via environment variable.  These are generally use for testing or adapting an expert subclass to the `fused_experts` API.
-    6. This depends on the experts implementation.
+!!! info "表格注释"
+    1. 支持所有类型：mxfp4、nvfp4、int4、int8、fp8
+    2. A,T 量化发生在分派之后
+    3. 所有量化都在分派后进行
+    4. 通过不同的环境变量控制（`VLLM_FLASHINFER_MOE_BACKEND`，可选 "throughput" 或 "latency"）
+    5. 这是一个无实际分派的调度器，可与任意模块化 experts 搭配，生成无需分派或 combine 的模块化内核。不能通过环境变量选择，通常用于测试或适配 expert 子类到 `fused_experts` API。
+    6. 依赖于 experts 的具体实现。
 
     ---
 
-    - G - Grouped
-    - G(N) - Grouped w/block size N
-    - A - Per activation token
-    - T - Per tensor
+    - G - 按组分组
+    - G(N) - 按块大小 N 分组
+    - A - 针对每个激活 token
+    - T - 针对每个张量
 
-Modular kernels are supported by the following `FusedMoEMethodBase` classes.
+模块化内核由以下 `FusedMoEMethodBase` 类支持：
 
 - [`ModelOptFp8MoEMethod`][vllm.model_executor.layers.quantization.modelopt.ModelOptFp8MoEMethod]
 - [`Fp8MoEMethod`][vllm.model_executor.layers.quantization.fp8.Fp8MoEMethod]
@@ -66,21 +66,21 @@ Modular kernels are supported by the following `FusedMoEMethodBase` classes.
 - [`Mxfp4MoEMethod`][vllm.model_executor.layers.quantization.mxfp4.Mxfp4MoEMethod]
 - [`UnquantizedFusedMoEMethod`][vllm.model_executor.layers.fused_moe.layer.UnquantizedFusedMoEMethod]
 
-## Fused MoE Experts Kernels
+## Fused MoE Experts 内核
 
-The are a number of MoE experts kernel implementations for different quantization types and architectures. Most follow the general API of the base Triton [`fused_experts`][vllm.model_executor.layers.fused_moe.fused_moe.fused_experts] function. Many have modular kernel adatpers so they can be used with compatible all2all backends. This table lists each experts kernel and its particular properties.
+针对不同的量化类型和硬件架构，MoE experts 实现了多种内核。大多数都遵循 Triton 基础 [`fused_experts`][vllm.model_executor.layers.fused_moe.fused_moe.fused_experts] 函数的通用 API。许多实现带有模块化内核适配器，可与兼容的 all2all 后端配合使用。下表列出了每种 experts 内核及其具体特性。
 
-Each kernel must be provided with one of the supported input activation formats.  Some flavors of kernels support both standard and batched formats through different entry points, e.g. `TritonExperts` and `BatchedTritonExperts`. Batched format kernels are currently only needed for matching with certain all2all backends, e.g. `pplx`, `DeepEPLLPrepareAndFinalize`.
+每个内核要求输入为支持的激活格式。有些内核支持 standard 和 batched 格式，分别有不同的入口，比如 `TritonExperts` 和 `BatchedTritonExperts`。目前 batched 格式主要用于与特定 all2all 后端（如 `pplx`、`DeepEPLLPrepareAndFinalize`）配合。
 
-Similar to the backend kernels, each experts kernel only supports certain quantization formats. For non-modular experts, the activations will be in the original type and quantized internally by the kernel. Modular experts will expect the activations to already be in the quantized format. Both types of experts will yield outputs in the original activation type.
+和后端类似，每个 experts 内核也只支持特定的量化格式。非模块化 experts 会在内部进行量化，而模块化 experts 要求输入激活已是量化格式。两者输出均为原始激活类型。
 
-Each experts kernel supports one or more activation functions, e.g. silu, gelu that are applied to the intermediate results.
+每个 experts 内核支持一种或多种激活函数（如 silu、gelu），这些函数会应用在中间结果上。
 
-As with the backends, some experts support applying topk weights on the input activations. The entries in the column in this table only apply to the non-modular experts.
+同样，有些 experts 支持在输入激活上应用 topk 权重。表中相关列只适用于非模块化 experts。
 
-Most experts flavors include an equivalent modular interface which will be a subclass of `FusedMoEPermuteExpertsUnpermute`.
+大多数 experts 变体都提供了等价的模块化接口，通常是 `FusedMoEPermuteExpertsUnpermute` 的子类。
 
-To be used with a particular `FusedMoEPrepareAndFinalize` sub-class, MoE kernels must have compatible activation formats, quantization types and quantization formats.
+要与某个 `FusedMoEPrepareAndFinalize` 子类配合使用，MoE 内核需满足激活格式、量化类型和量化格式的兼容性。
 
 | Kernel                       | Input act. format     | Quant. types     | Quant. format | Activation function                                         | Apply Weight On Input | Modular | Source                                                                                                                                                                                                                                                                                                      |
 |------------------------------|-----------------------|------------------|---------------|-------------------------------------------------------------|-----------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -101,20 +101,9 @@ To be used with a particular `FusedMoEPrepareAndFinalize` sub-class, MoE kernels
 | cpu_fused_moe                | standard              | N/A              | N/A           | silu                                                        | N                     | N       | [`CPUFusedMOE`][vllm.model_executor.layers.fused_moe.cpu_fused_moe.CPUFusedMOE]                                                                                                                                                                                                                             |
 | naive batched<sup>4</sup>    | batched               | int8,</br>fp8    | G,A,T         | silu, gelu                                                  | <sup>6</sup>          | Y       | [`NaiveBatchedExperts`][vllm.model_executor.layers.fused_moe.fused_batched_moe.NaiveBatchedExperts]                                                                                                                                                                                                         |
 
-!!! info "Table key"
-    1. All types: mxfp4, nvfp4, int4, int8, fp8
-    2. A dispatcher wrapper around triton and deep gemm experts.  Will select based on type + shape + quantization params
-    3. uint4, uint8, fp8, fp4
-    4. This is a naive implementation of experts that supports batched format. Mainly used for testing.
-    5. The `activation` parameter is ignored and SwiGlu is used by default instead.
-    6. Only handled by or supported when used with modular kernels.
-
-## Modular Kernel "families"
-
-The following table shows "families" of modular kernels that are intended to work together. There are some combinations which may work but have not yet been tested, e.g. flashinfer with other fp8 experts. Note that the "naive" backend will work with any non-modular experts.
-
-| backend                          | `FusedMoEPrepareAndFinalize` subclasses                    | `FusedMoEPermuteExpertsUnpermute` subclasses                                                                               |
-|----------------------------------|------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| deepep_high_throughput           | `DeepEPHTPrepareAndFinalize`                               |  `DeepGemmExperts`,</br>`TritonExperts`,</br>`TritonOrDeepGemmExperts`,</br>`CutlassExpertsFp8`, </br>`MarlinExperts`                                  |
-| deepep_low_latency,</br>pplx     | `DeepEPLLPrepareAndFinalize`,</br>`PplxPrepareAndFinalize` |  `BatchedDeepGemmExperts`,</br>`BatchedTritonExperts`,</br>`BatchedTritonOrDeepGemmExperts`,</br>`CutlassBatchedExpertsFp8`,</br>`BatchedMarlinExperts`|
-| flashinfer                       | `FlashInferCutlassMoEPrepareAndFinalize`                   | `FlashInferExperts`                                                                                                                                    |
+!!! info "表格注释"
+    1. 支持所有类型：mxfp4、nvfp4、int4、int8、fp8
+    2. 一个将 triton 和 deep gemm experts 包装在一起的调度器，会根据类型、形状和量化参数自动选择
+    3. 支持 uint4、uint8、fp8、fp4
+    4. 这是一个简单的 batched 格式 experts 实现，主要用于测试
+    5. `activation`

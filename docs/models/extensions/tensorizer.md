@@ -1,28 +1,24 @@
-# Loading models with CoreWeave's Tensorizer
+# 使用 CoreWeave 的 Tensorizer 加载模型
 
-vLLM supports loading models with [CoreWeave's Tensorizer](https://docs.coreweave.com/coreweave-machine-learning-and-ai/inference/tensorizer).
-vLLM model tensors that have been serialized to disk, an HTTP/HTTPS endpoint, or S3 endpoint can be deserialized
-at runtime extremely quickly directly to the GPU, resulting in significantly
-shorter Pod startup times and CPU memory usage. Tensor encryption is also supported.
+vLLM 支持使用 [CoreWeave 的 Tensorizer](https://docs.coreweave.com/coreweave-machine-learning-and-ai/inference/tensorizer) 来加载模型  
+将 vLLM 模型的张量（tensors）序列化到磁盘、HTTP/HTTPS 端点或 S3 端点后，可以在运行时直接将其高速反序列化到 GPU 上，大幅缩短 Pod 启动时间并减少 CPU 内存占用。同时还支持张量加密。
 
-vLLM fully integrates Tensorizer in to its model loading machinery. The following will give a brief overview on how to get started with using Tensorizer on vLLM.
+vLLM 已经将 Tensorizer 完全集成到其模型加载流程中。下面将简单介绍如何在 vLLM 上使用 Tensorizer。
 
-## Installing Tensorizer
+## 安装 Tensorizer
 
-To install `tensorizer`, run `pip install vllm[tensorizer]`.
+要安装 `tensorizer`，只需运行 `pip install vllm[tensorizer]`。
 
-## The basics
+## 基本用法
 
-To load a model using Tensorizer, the model first needs to be serialized by
-Tensorizer. [The example script](../../examples/others/tensorize_vllm_model.md) takes care of this process.
+要通过 Tensorizer 加载模型，首先需要用 Tensorizer 对模型进行序列化  
+可以参考[示例脚本](../../examples/others/tensorize_vllm_model.md)完成这个过程。
 
-Let's walk through a basic example by serializing `facebook/opt-125m` using the script, and then loading it for inference.
+以序列化 `facebook/opt-125m` 为例，演示如何用脚本将其序列化并加载用于推理。
 
-## Serializing a vLLM model with Tensorizer
+## 用 Tensorizer 序列化 vLLM 模型
 
-To serialize a model with Tensorizer, call the example script with the necessary
-CLI arguments. The docstring for the script itself explains the CLI args
-and how to use it properly in great detail, and we'll use one of the examples from the docstring directly, assuming we want to serialize and save our model at our S3 bucket example `s3://my-bucket`:
+要用 Tensorizer 序列化模型，只需在命令行通过示例脚本传递相应参数即可。该脚本的 docstring 详细说明了所有 CLI 参数和用法，这里直接采用其中的例子。假设你想将序列化后的模型保存到 S3 存储桶 `s3://my-bucket`：
 
 ```bash
 python examples/others/tensorize_vllm_model.py \
@@ -32,7 +28,7 @@ python examples/others/tensorize_vllm_model.py \
    --suffix v1
 ```
 
-This saves the model tensors at `s3://my-bucket/vllm/facebook/opt-125m/v1`. If you intend on applying a LoRA adapter to your tensorized model, you can pass the HF id of the LoRA adapter in the above command, and the artifacts will be saved there too:
+这会将模型张量保存到 `s3://my-bucket/vllm/facebook/opt-125m/v1`。如果你还需要为序列化后的模型应用 LoRA 适配器，可以在上面的命令中指定 LoRA 适配器的 HF id，相应的文件也会一并保存：
 
 ```bash
 python examples/others/tensorize_vllm_model.py \
@@ -43,9 +39,9 @@ python examples/others/tensorize_vllm_model.py \
    --suffix v1
 ```
 
-## Serving the model using Tensorizer
+## 使用 Tensorizer 部署模型
 
-Once the model is serialized where you want it, you can load the model using `vllm serve` or the `LLM` entrypoint. You can pass the directory where you saved the model to the `model` argument for `LLM()` and `vllm serve`. For example, to serve the tensorized model saved previously with the LoRA adapter, you'd do:
+当模型序列化到指定位置后，就可以用 `vllm serve` 或 `LLM` 入口加载模型。只需将模型保存目录传给 `LLM()` 或 `vllm serve` 的 `model` 参数即可。例如，要加载之前带 LoRA 适配器的序列化模型，可以这样操作：
 
 ```bash
 vllm serve s3://my-bucket/vllm/facebook/opt-125m/v1 \
@@ -53,7 +49,7 @@ vllm serve s3://my-bucket/vllm/facebook/opt-125m/v1 \
     --enable-lora 
 ```
 
-Or, with `LLM()`:
+或者用 `LLM()`：
 
 ```python
 from vllm import LLM
@@ -64,11 +60,11 @@ llm = LLM(
 )
 ```
 
-## Options for configuring Tensorizer
+## Tensorizer 配置选项
 
-`tensorizer`'s core objects that serialize and deserialize models are `TensorSerializer` and `TensorDeserializer` respectively. In order to pass arbitrary kwargs to these, which will configure the serialization and deserialization processes, you can provide them as keys to `model_loader_extra_config` with `serialization_kwargs` and `deserialization_kwargs` respectively. Full docstrings detailing all parameters for the aforementioned objects can be found in `tensorizer`'s [serialization.py](https://github.com/coreweave/tensorizer/blob/main/tensorizer/serialization.py) file.
+`tensorizer` 的核心对象分别为 `TensorSerializer`（序列化）和 `TensorDeserializer`（反序列化）。如果你需要给这两个过程自定义参数，可以通过 `model_loader_extra_config` 传递，其中序列化参数用 `serialization_kwargs`，反序列化参数用 `deserialization_kwargs`。完整参数说明可参考 `tensorizer` 的 [serialization.py](https://github.com/coreweave/tensorizer/blob/main/tensorizer/serialization.py) 文件。
 
-As an example, CPU concurrency can be limited when serializing with `tensorizer` via the `limit_cpu_concurrency` parameter in the initializer for `TensorSerializer`. To set `limit_cpu_concurrency` to some arbitrary value, you would do so like this when serializing:
+比如，在序列化时你可以通过 `TensorSerializer` 的 `limit_cpu_concurrency` 参数限制 CPU 并发数。要设置该参数，可以这样：
 
 ```bash
 python examples/others/tensorize_vllm_model.py \
@@ -80,7 +76,7 @@ python examples/others/tensorize_vllm_model.py \
    --suffix v1
 ```
 
-As an example when customizing the loading process via `TensorDeserializer`, you could limit the number of concurrency readers during deserialization with the `num_readers` parameter in the initializer via `model_loader_extra_config` like so:
+如果你想在加载时自定义反序列化过程，比如通过 `TensorDeserializer` 的 `num_readers` 参数限制并发读取数量，可以像这样通过 `model_loader_extra_config` 传递：
 
 ```bash
 vllm serve s3://my-bucket/vllm/facebook/opt-125m/v1 \
@@ -89,7 +85,7 @@ vllm serve s3://my-bucket/vllm/facebook/opt-125m/v1 \
     --model-loader-extra-config '{"deserialization_kwargs": {"num_readers": 2}}'
 ```
 
-Or with `LLM()`:
+或者用 `LLM()`：
 
 ```python
 from vllm import LLM

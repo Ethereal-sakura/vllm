@@ -1,11 +1,11 @@
-# Sponsors
+# 赞助商
 
-vLLM is a community project. Our compute resources for development and testing are supported by the following organizations. Thank you for your support!
+vLLM 是一个社区项目。我们的开发与测试算力资源由以下机构支持。感谢你们的支持！
 
-<!-- Note: Please sort them in alphabetical order. -->
-<!-- Note: Please keep these consistent with README.md. -->
+<!-- 注意：请按字母顺序排列。 -->
+<!-- 注意：请确保与 README.md 保持一致。-->
 
-Cash Donations:
+现金捐赠：
 
 - a16z
 - Dropbox
@@ -13,7 +13,7 @@ Cash Donations:
 - Skywork AI
 - ZhenFund
 
-Compute Resources:
+算力资源支持：
 
 - Alibaba Cloud
 - AMD
@@ -36,6 +36,6 @@ Compute Resources:
 - UC San Diego
 - Volcengine
 
-Slack Sponsor: Anyscale
+Slack 赞助商：Anyscale
 
-We also have an official fundraising venue through [OpenCollective](https://opencollective.com/vllm). We plan to use the fund to support the development, maintenance, and adoption of vLLM.
+我们还通过 [OpenCollective](https://opencollective.com/vllm) 提供了官方的募捐渠道。我们计划将这笔资金用于支持 vLLM 的开发、维护和推广。

@@ -1,6 +1,6 @@
 # GPU
 
-vLLM is a Python library that supports the following GPU variants. Select your GPU type to see vendor specific instructions:
+vLLM 是一个 Python 库，支持以下几种 GPU 类型。请选择你的 GPU 类型，查看针对不同厂商的安装说明：
 
 === "NVIDIA CUDA"
 
@@ -14,13 +14,13 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:installation"
 
-## Requirements
+## 系统要求
 
-- OS: Linux
-- Python: 3.10 -- 3.13
+- 操作系统：Linux
+- Python 版本：3.10 -- 3.13
 
 !!! note
-    vLLM does not support Windows natively. To run vLLM on Windows, you can use the Windows Subsystem for Linux (WSL) with a compatible Linux distribution, or use some community-maintained forks, e.g. [https://github.com/SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows).
+    vLLM 当前不原生支持 Windows。如果你需要在 Windows 上运行 vLLM，可以使用 Windows Subsystem for Linux（WSL）并安装兼容的 Linux 发行版，或者尝试一些社区维护的分支，例如 [https://github.com/SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows)
 
 === "NVIDIA CUDA"
 
@@ -34,9 +34,9 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:requirements"
 
-## Set up using Python
+## 使用 Python 环境进行安装
 
-### Create a new Python environment
+### 创建新的 Python 环境
 
 --8<-- "docs/getting_started/installation/python_env_setup.inc.md"
 
@@ -52,7 +52,7 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:set-up-using-python"
 
-### Pre-built wheels
+### 预编译的 wheel 包
 
 === "NVIDIA CUDA"
 
@@ -66,7 +66,7 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:pre-built-wheels"
 
-### Build wheel from source
+### 从源码构建 wheel 包
 
 === "NVIDIA CUDA"
 
@@ -80,9 +80,9 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:build-wheel-from-source"
 
-## Set up using Docker
+## 使用 Docker 部署
 
-### Pre-built images
+### 预构建镜像
 
 === "NVIDIA CUDA"
 
@@ -96,7 +96,7 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:pre-built-images"
 
-### Build image from source
+### 从源码构建镜像
 
 === "NVIDIA CUDA"
 
@@ -110,7 +110,7 @@ vLLM is a Python library that supports the following GPU variants. Select your G
 
     --8<-- "docs/getting_started/installation/gpu.xpu.inc.md:build-image-from-source"
 
-## Supported features
+## 支持的功能特性
 
 === "NVIDIA CUDA"
 

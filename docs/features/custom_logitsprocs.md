@@ -1,96 +1,92 @@
-# Custom Logits Processors
+# 自定义 Logits Processor
 
 !!! important
-    Some logits processors design changes are still in progress and the API may
-    change in the near future. We hope to stabilize this part of the API soon
+    部分 logits processor 的设计还在持续迭代中，相关 API 在近期可能会有变化。我们希望尽快稳定这部分 API
 
-A "custom" logits processor is written by a user of vLLM and is loaded into vLLM at initialization without needing to modify or recompile the vLLM source code. It is the opposite of a built-in logits processor.
+“自定义” logits processor 是 vLLM 用户自己编写的，可以在初始化时加载到 vLLM，无需修改或重新编译 vLLM 源代码。它与内置 logits processor 相对。
 
-This document shows how to write, load and use a custom logits processor.
+本文将介绍如何编写、加载并使用自定义 logits processor。
 
-## Logits Processors Background
+## Logits Processor 背景知识
 
-A logits processor adjusts the next-token probability distribution, usually with the intention of steering the model towards a desired type of behavior.
+logits processor 主要用于调整下一个 token 的概率分布，通常目的是让模型输出更接近预期的行为。
 
-In vLLM, logits processors operate at batch granularity. During a given engine step, the logits processor consumes a `(num_requests) x (vocab_size)` tensor of raw logits output by the model. For all requests which enable the logits processor, the logits processor applies a transformation to the corresponding row of the logits tensor, while leaving other rows unmodified. The transformed logits tensor is then passed to softmax.  
+在 vLLM 中，logits processor 是按批次（batch）粒度工作的。在每一步引擎执行时，logits processor 会处理一个形状为 `(num_requests) x (vocab_size)` 的原始 logits 张量（即模型输出）。对于启用了 logits processor 的请求，logits processor 会对对应的 logits 行进行变换，未启用则保持不变。变换后的 logits 会交给 softmax 处理。
 
-## Creating a Custom Logits Processor
+## 如何创建自定义 Logits Processor
 
-Custom logits processors must subclass `vllm.v1.sample.logits_processor.LogitsProcessor` and define (at minimum) the following methods:
+自定义的 logits processor 必须继承自 `vllm.v1.sample.logits_processor.LogitsProcessor`，并至少实现以下方法：
 
 * `__init__(self, vllm_config: VllmConfig, device: torch.device, is_pin_memory: bool)`
-    * `vllm_config`: engine configuration data structure
-    * `device`: hardware accelerator device info
-    * `is_pin_memory`: flag indicating whether pin memory is available to support logits processor implementation
+    * `vllm_config`：引擎配置
+    * `device`：硬件加速设备信息
+    * `is_pin_memory`：是否支持 pin memory，辅助 logits processor 实现
 
-* `apply(self, logits: torch.Tensor) -> torch.Tensor`:
-    * Consume a `(num_requests) x (vocab_size)` logits tensor (`logits`)
-    * Apply logits processor transformation at batch granularity
-    * Return a transformed `(num_requests) x (vocab_size)` logits tensor
-    * You can modify the input logits processors in-place or out-of-place; in-place is more memory-efficient
+* `apply(self, logits: torch.Tensor) -> torch.Tensor`：
+    * 输入一个 `(num_requests) x (vocab_size)` 的 logits 张量
+    * 对 batch 内所有请求进行 logits 变换操作
+    * 返回变换后的 logits 张量（形状同输入）
+    * 你可以选择原地（in-place）或非原地（out-of-place）修改 logits，原地修改更节省内存
 
-* `is_argmax_invariant(self) -> bool`:
-    * Return `True` if the logits processor is argmax invariant (never changes what is the highest-logit-value token ID for a given request), `False` if the logits processor may modify argmax
-    * `is_argmax_invariant()` is evaluated once at startup; if `True`, vLLM will skip applying this logits processor in a given step when all requests use greedy sampling
+* `is_argmax_invariant(self) -> bool`：
+    * 如果 logits processor 保证不会改变每个请求的最大 logits（即 argmax）的 token id，则返回 `True`；否则返回 `False`
+    * `is_argmax_invariant()` 在启动时只会被调用一次；如果返回 `True`，当所有请求都采用贪婪采样时，vLLM 会跳过这个 logits processor
 
-* `update_state(self, batch_update: Optional["BatchUpdate"]) -> None`:
-    * Consume a `BatchUpdate` data structure representing persistent batch state changes at the beginning of the current engine step
-    * Use the `BatchUpdate` members to update logits processor internal state
-    * **Note:** batch update data structure may be `None`, signaling no change to the batch constituents. In this case, the LogitsProcessor might still want to update its state based on the updated `output_token_ids` lists that it could have retained when they were added.
+* `update_state(self, batch_update: Optional["BatchUpdate"]) -> None`：
+    * 接收一个 `BatchUpdate` 结构体，表示当前引擎步开始时 batch 的持久状态变化
+    * 使用 `BatchUpdate` 内的信息更新 logits processor 的内部状态
+    * **注意：** `batch_update` 可能为 `None`，表示 batch 成员没有变化。在这种情况下，LogitsProcessor 仍可以基于之前保存的 `output_token_ids` 列表更新内部状态
 
-### How the vLLM engine builds the `BatchUpdate` data structure
+### vLLM 引擎如何构建 `BatchUpdate` 结构体
 
 !!! important
-    Some logits processors design changes are still in progress. We expect
-    that in the future you will not need to account for batch state changes
-    when implementing a logits processor, and the information in this section
-    will become irrelevant.
+    部分 logits processor 的设计还在持续调整。我们预计未来实现 logits processor 时无需关注 batch 状态变化，届时本节内容将不再适用。
 
-Logits processor `update_state()` implementations should assume the following model for how the model runner updates persistent batch state (expressed here in terms of the `BatchUpdate` abstraction):
+实现 logits processor 的 `update_state()` 时，需要理解模型执行时如何更新 batch 的持久状态（以 `BatchUpdate` 抽象说明）：
 
-1. Identify indices of requests which finished in the current engine step
+1. 找出本步已完成的请求的索引
 
-2. Identify new requests introduced in the current step
+2. 找出本步新加入的请求
 
-3. Use Add operations to replace as many finished requests with new requests, in order of increasing index of the replaced request starting with the lowest index
+3. 用 Add 操作将新请求尽量替换已完成的请求，按被替换请求的索引递增顺序进行
 
-4. Based on the relative number of new and finished requests:
+4. 根据新请求和已完成请求的数量关系：
 
-    1. If the numbers of new and finished requests are the same, proceed to next step
+    1. 若数量相等，直接进入下一步
 
-    2. *If there are more new requests than finished requests:* apply Add operations to extend the batch with the remaining new requests which did not replace finished requests. Assign consecutive indices to these new requests, starting with `current_max_batch_index + 1`
+    2. *新请求多于已完成请求*：用 Add 操作将剩余新请求添加到 batch 末尾，并为这些新请求分配连续索引，从 `current_max_batch_index + 1` 开始
 
-    3. *If there are fewer new requests than finished requests:*
+    3. *新请求少于已完成请求*：
 
-        * Apply Remove operations to finished requests which were not replaced with new requests. These removed request indices will necessarily be greater than the greatest index of the finished requests which were replaced in the previous step. The Removes may leave the batch in a non-contiguous state
+        * 用 Remove 操作将未被新请求替换的已完成请求移除。被移除请求的索引必然大于前面被替换的请求的最大索引，Remove 可能导致 batch 索引不连续
 
-        * **"Condense" the batch to be contiguous:** starting with the lowest-index empty slot (which was caused by a Remove), apply a Unidirectional Move from the current highest non-empty slot in the batch to fill the empty slot. Proceed with additional Unidirectional Move operations in order of increasing empty slot destination index and decreasing non-empty slot source index until the batch is contiguous
+        * **“压缩” batch：** 从最小的空槽（由 Remove 产生）开始，用单向 Move 将当前 batch 中最大索引的非空槽填充到空槽，继续按升序空槽索引、降序非空槽索引顺序执行 Move 直到 batch 连续
 
-        * **Shrink the batch:** a side-effect of condensing the batch is that empty slots resulting from Remove operations are grouped in a contiguous block at the end of the batch array. Thus, after condensing, update `BatchUpdate.batch_size` to reflect the number of non-empty slots
+        * **缩减 batch 大小：** 压缩后，所有空槽会被移到 batch 数组末尾，最后更新 `BatchUpdate.batch_size` 以反映实际非空槽数量
 
-5. Reorder the batch for improved efficiency. Depending on the attention backend implementation and the current characteristics of the batch, zero or more Swap Move operations may be applied to reorder the batch
+5. 为提升效率，可能对 batch 进行排序。具体排序操作（Swap Move）数量与 attention 后端实现及 batch 特性有关
 
-Notes:
+注意事项：
 
-* A logits processor `update_state()` method must process batch update operations in the following order: removes, adds, moves
+* `update_state()` 必须按以下顺序处理 batch 操作：先 Remove，再 Add，最后 Move
 
-* The index argument for Add operations refers to the index *at the time the Add occurred*, i.e. before any Move operations
-    * Example: if a request is Added at index 5 and then swapped with index 3, the Add operation in `BatchUpdate.added` will be associated with index 5 not 3
-    * In other words Move operations can be assumed to be applied after Adds and Removes
+* Add 操作的 index 表示 *Add 发生时* 的索引（即未执行任何 Move 前的索引）
+    * 例如：如果请求在索引 5 处 Add，然后与索引 3 互换，`BatchUpdate.added` 中 Add 仍记录为索引 5
+    * 换句话说，Move 操作总是在 Add/Remove 之后执行
 
-* Move operations can be assumed to be applied in the order in which they appear in `BatchUpdate.moved`
+* Move 操作顺序同 `BatchUpdate.moved` 中的顺序
 
-* If there are no new/finished requests and there is no batch reordering, then the batch update for the logits processors will be `None`
+* 如果没有新请求/已完成请求，也没有 batch 排序，则 logits processor 收到的 batch update 会是 `None`
 
-### Passing Custom Argument to a Custom Logits Processor
+### 为自定义 Logits Processor 传递自定义参数
 
-Unlike built-in logits processors, custom logits processors may require configuration arguments that are not hard-coded into `SamplingParams` or the vLLM server REST API. To solve this problem, custom logits processors may leverage vLLM [custom arguments](./custom_arguments.md) support to receive configuration settings from the user (although you are also free to design a custom logits processor which utilizes the pre-existing fields in `SamplingParams`.)
+与内置 logits processor 不同，自定义 logits processor 可能需要配置一些未硬编码在 `SamplingParams` 或 vLLM 服务器 REST API 中的参数。为此，可以参考 vLLM [自定义参数](./custom_arguments.md) 的机制，让用户传递自定义配置（当然，你也可以让你的 processor 只用 `SamplingParams` 里的已有字段）。
 
-### Example Custom Logits Processor Implementation
+### 自定义 Logits Processor 示例
 
-The contrived example below implements a custom logits processor which consumes a `(num\_requests) \times (vocab\_size)` logits tensor and masks out all tokens except for one (`target_token`) with `float(-inf)`. The logits processor is disabled for any request that does not specify `target_token`. To determine whether the logits processor is enabled and which token to leave unmasked, the logits processor checks `SamplingParams.extra_args` for a `target_token` custom argument associated with each request:
+下面是一个简单示例，实现了一个自定义 logits processor：它接收一个 `(num_requests) \times (vocab_size)` 的 logits 张量，只保留每个请求指定的 `target_token`，其他 token logits 设为 `float(-inf)`。如果某个请求未指定 `target_token`，则该请求不启用此 logits processor。是否启用以及保留哪个 token，由 logits processor 检查 `SamplingParams.extra_args` 对应的 `target_token` 参数决定：
 
-??? code "Example custom logits processor definition"
+??? code "自定义 logits processor 示例"
 
     ``` python
     import torch
@@ -101,21 +97,21 @@ The contrived example below implements a custom logits processor which consumes 
                                                 MoveDirectionality)
 
     class DummyLogitsProcessor(LogitsProcessor):
-        """Fake logit processor to support unit testing and examples"""
+        """伪造的 logits processor，用于单元测试和示例"""
 
         def __init__(self, vllm_config: "VllmConfig", device: torch.device,
                     is_pin_memory: bool):
             self.req_info: dict[int, int] = {}
 
         def is_argmax_invariant(self) -> bool:
-            """Never impacts greedy sampling"""
+            """不会影响贪婪采样"""
             return False
 
         def update_state(self, batch_update: BatchUpdate | None):
             if not batch_update:
                 return
 
-            # Process added requests.
+            # 处理新增请求
             for index, params, _, _ in batch_update.added:
                 assert params is not None
                 if params.extra_args and (target_token :=
@@ -125,12 +121,11 @@ The contrived example below implements a custom logits processor which consumes 
                     self.req_info.pop(index, None)
 
             if self.req_info:
-                # Process removed requests.
+                # 处理移除的请求
                 for index in batch_update.removed:
                     self.req_info.pop(index, None)
 
-                # Process moved requests, unidirectional move (a->b) and swap
-                # (a<->b)
+                # 处理请求的移动（单向 move 或 swap）
                 for adx, bdx, direct in batch_update.moved:
                     a_val = self.req_info.pop(adx, None)
                     b_val = self.req_info.pop(bdx, None)
@@ -143,7 +138,7 @@ The contrived example below implements a custom logits processor which consumes 
             if not self.req_info:
                 return logits
 
-            # Save target values before modification
+            # 修改前保存目标 token 的值
             cols = torch.tensor(
                 list(self.req_info.values()), dtype=torch.long, device=logits.device
             )
@@ -152,20 +147,20 @@ The contrived example below implements a custom logits processor which consumes 
             )
             values_to_keep = logits[rows, cols].clone()
 
-            # Mask all but target tokens
+            # 除目标 token 外全部 mask
             logits[rows] = float('-inf')
             logits[rows, cols] = values_to_keep
 
             return logits
     ```
 
-In the rest of this document, we will use `DummyLogitsProcessor` as an example of a custom logits processor.
+在本文后续示例中，都将以 `DummyLogitsProcessor` 作为自定义 logits processor 的代表。
 
-The `DummyLogitsProcessor.update_state()` implementation maintains a "sparse" representation of the batched requests in the `self.req_info` dictionary: only those requests which specify a `target_token` value have a key in the dictionary. `update_state()` adjusts the stored request indices and `target_token` values (keys and values respectively in `self.req_info`) in response to Add, Remove and Move operations against the persistent batch.
+`DummyLogitsProcessor.update_state()` 通过字典 `self.req_info` 维护 batch 内请求的“稀疏”表示：只有显式指定了 `target_token` 的请求才有字典项。`update_state()` 会根据 Add/Remove/Move 操作调整字典里的请求索引和 `target_token`（即 key 和 value）。
 
-### Wrapping an Existing Request-Level Logits Processor
+### 包装已有的“请求级” Logits Processor
 
-Although the vLLM engine applies logits processors at batch granularity, some users may want to use vLLM with a "request-level" logits processor implementation - an implementation which operates on individual requests. This will be especially true if your logits processor was developed for vLLM version 0, which required it to be a `Callable` (as described [here](https://docs.vllm.ai/en/v0.10.1.1/api/vllm/logits_process.html)) conforming to the following type annotation:
+虽然 vLLM 引擎要求 logits processor 按 batch 粒度工作，但有些用户希望沿用“请求级” logits processor（即只处理单个请求的实现方式）。这种情况在你用过 vLLM 0.x 版本时尤其常见，当时要求 logits processor 是一个 `Callable`，类型如下（见 [v0 文档](https://docs.vllm.ai/en/v0.10.1.1/api/vllm/logits_process.html)）：
 
 ``` python
 RequestLogitsProcessor = Union[
@@ -178,29 +173,28 @@ RequestLogitsProcessor = Union[
 ]
 ```
 
-While request-level logits processors are explicitly *not* supported in the vLLM engine, vLLM *does* provide a convenient process to wrap an existing `Callable` request-level logits processor and create a batch-level logits processor that is compatible with vLLM. The `Callable` must conform to the type annotation above; if your request-level logits processor has a different interface, then in order to wrap it, you may need to modify it or implement an additional wrapper layer to comply with the interface specification above.
+虽然 vLLM 新引擎不直接支持请求级 logits processor，但你可以通过封装（wrap）的方式，将现有的“请求级” Callable processor 适配成批处理（batch-level）logits processor。只要你的 Callable 满足上述类型注解即可；如果接口不同，需要你自己加一层封装。
 
-You can wrap the request-level logits processor by subclassing `AdapterLogitsProcessor` as shown in the example below (in this example, `DummyPerReqLogitsProcessor` is a stand-in for your request-level logits processor which needs to be wrapped.) Override `AdapterLogitsProcessor.is_argmax_invariant(self)` to accurately reflect whether your request-level logits processor may impact which token has the highest-value logit. Override `AdapterLogitsProcessor.new_req_logits_processor(self,params)` to create a new request-level logits processor instance from a `SamplingParams` instance:
+只需继承 `AdapterLogitsProcessor`，即可包装你的请求级 logits processor。你需要重写 `AdapterLogitsProcessor.is_argmax_invariant(self)`，反映你的 processor 是否会影响 argmax；还需重写 `AdapterLogitsProcessor.new_req_logits_processor(self,params)`，通过 `SamplingParams` 创建一个请求级 logits processor 实例：
 
-??? code "Example of Wrapping a Request-Level Logits Processor"
+??? code "如何包装请求级 logits processor 示例"
 
     ``` python
     ...
 
     from vllm.v1.sample.logits_processor import (
-        AdapterLogitsProcessor, # Wrapper base-class
-        RequestLogitsProcessor, # Request-level logitsproc type annotation
+        AdapterLogitsProcessor, # 封装基类
+        RequestLogitsProcessor, # 请求级 logits processor 类型
     )
 
     ...
 
-    # Stand-in for your request-level logits processor:
+    # 你的请求级 logits processor 示例
     class DummyPerReqLogitsProcessor:
-        """The request-level logits processor masks out all logits except the
-        token id identified by `target_token`"""
+        """请求级 logits processor，仅保留 target_token 的 logits"""
 
         def __init__(self, target_token: int) -> None:
-            """Specify `target_token`"""
+            """指定 target_token"""
             self.target_token = target_token
 
         def __call__(
@@ -215,10 +209,9 @@ You can wrap the request-level logits processor by subclassing `AdapterLogitsPro
 
     ...
 
-    # Example of wrapping the request-level logits processor:
+    # 封装请求级 logits processor 的示例
     class WrappedPerReqLogitsProcessor(AdapterLogitsProcessor):
-        """Example of wrapping a fake request-level logit processor to create a
-        batch-level logits processor"""
+        """包装伪造的请求级 logits processor，生成 batch 级 logits processor"""
 
         def is_argmax_invariant(self) -> bool:
             return False
@@ -227,18 +220,15 @@ You can wrap the request-level logits processor by subclassing `AdapterLogitsPro
             self,
             params: SamplingParams,
         ) -> Optional[RequestLogitsProcessor]:
-            """This method returns a new request-level logits processor, customized
-            to the `target_token` value associated with a particular request.
+            """为每个请求返回一个新的请求级 logits processor 实例。
 
-            Returns None if the logits processor should not be applied to the
-            particular request. To use the logits processor the request must have
-            a "target_token" custom argument with an integer value.
+            如果该请求不需要应用 logits processor，则返回 None。要求该请求必须有整数类型的 "target_token" 自定义参数。
 
-            Args:
-            params: per-request sampling params
+            参数:
+            params: 每个请求的采样参数
 
-            Returns:
-            `Callable` request logits processor, or None
+            返回:
+            返回 Callable 形式的请求级 logits processor 或 None
             """
             target_token: Optional[Any] = params.extra_args and params.extra_args.get(
                 "target_token"
@@ -256,189 +246,103 @@ You can wrap the request-level logits processor by subclassing `AdapterLogitsPro
     ```
 
 !!! note
-    Your `new_req_logits_processor()` override can return `None` to signal that the wrapped logits processor should not be applied to the request in question.
+    你可以在 `new_req_logits_processor()` 里返回 `None`，表示该请求不需要应用被包装的 logits processor。
 
-Once you have created a custom subclass (like `WrappedPerReqLogitsProcessor`) which wraps your request level logits processor, you can pass the custom subclass to vLLM via any of the methods described in the following section.
+当你实现了一个自定义子类（如 `WrappedPerReqLogitsProcessor`）包装你的请求级 logits processor 后，可以通过下文讲述的任一方式将该自定义类加载到 vLLM。
 
-## Ways to Load Your Custom Logits Processor in vLLM
+## 在 vLLM 加载自定义 Logits Processor 的方法
 
-Logits processors are loaded at initialization. Critically, the set of loaded logits processors cannot be modified after the vLLM engine finishes loading, and new logits logits processors cannot be loaded on-demand for individual requests.
+logits processor 需要在 vLLM 初始化时加载。注意，一旦 vLLM 引擎初始化完成，已加载的 logits processor 集合就不可再更改，不能按需为单个请求动态加载新 logits processor。
 
-This section details different ways of making your logits processor visible to vLLM and triggering vLLM to load your logits processor.
+本节介绍让自定义 logits processor 被 vLLM 识别并加载的几种方式。
 
-### Method 1: Pass the Custom Logits Processor Fully-Qualified Class Name (FQCN) to vLLM at Initialization Time
+### 方法 1：在初始化时传入自定义 logits processor 的 FQCN（全限定类名）
 
-This method is supported in both offline and online vLLM usage scenarios. The custom logits processor's FQCN (in the form of `dotted.path.to.module:ClassName`) can be passed as an argument to the `LLM` and `AsyncLLM` Python constructors, or as a CLI argument to `vllm serve` with the following syntax
+此方法适用于 vLLM 离线和在线两种场景。自定义 logits processor 的 FQCN（即 `dotted.path.to.module:ClassName` 形式）可以作为参数传递给 `LLM` 和 `AsyncLLM` 的 Python 构造函数，或用命令行参数传递给 `vllm serve`，如下所示：
 
 ``` bash
 vllm serve ... --logits_processors <logits processor 1> <logits processor 2> ...
 ```
 
-The only requirements on the FQCN are
+FQCN 需满足以下条件：
 
-1. Python's `importlib.import_module()` must be able to resolve the dotted path portion of the FQCN and load it as a module
+1. Python 的 `importlib.import_module()` 能找到 FQCN 前半部分模块并加载
 
-2. The class-name portion of the FQCN must be possible to import from the loaded module
+2. FQCN 后半部分的类名可从该模块导入
 
-3. The object pointed to by the FQCN must be a subclass of `LogitsProcessor`
+3. FQCN 指向的类必须是 `LogitsProcessor` 的子类
 
-See examples below:
+示例如下：
 
-??? code "Passing custom logits processor FQCN to `LLM` in Python"
+??? code "在 Python 中传递自定义 logits processor FQCN 给 `LLM`"
 
     ``` python
-    # Pass in FQCN
+    # 传入 FQCN
     llm = LLM(
         model="facebook/opt-125m",
         logits_processors=["your.module.path:DummyLogitsProcessor"],
     )
     ```
 
-??? code "Passing custom logits processor FQCN to `AsyncLLM` in Python"
+??? code "在 Python 中传递自定义 logits processor FQCN 给 `AsyncLLM`"
 
     ``` python
-    # Pass in FQCN
+    # 传入 FQCN
     engine_args = AsyncEngineArgs(model="facebook/opt-125m",
                                   logits_processors=["your.module.path:DummyLogitsProcessor"])
     async_llm = AsyncLLM.from_engine_args(engine_args)
     ```
 
-??? code "Passing custom logits processor FQCN to vLLM server via CLI"
+??? code "通过 CLI 给 vLLM server 传递自定义 logits processor FQCN"
 
     ```bash
     vllm serve facebook/opt-125m --logits_processors your.module.path:DummyLogitsProcessor
     ```
 
-### Method 2: Automatically Detect Custom Logits Processors Installed in Your Python Environment As Entry Points
+### 方法 2：自动检测 Python 环境中以 entry point 形式安装的自定义 logits processor
 
-[`setuptools`](https://setuptools.pypa.io/en/latest/userguide/entry_point.html) can enable installed packages to make themselves available as plugins to other Python programs, via pieces of metadata known as "entry points".
+使用 [`setuptools`](https://setuptools.pypa.io/en/latest/userguide/entry_point.html) 的 entry point 功能，可以让已安装的包自动作为插件提供给其它 Python 程序。
 
-During initialization, vLLM automatically scans the `vllm.logits_processors` entry point group and loads any installed logits processors which it finds.
+vLLM 初始化时会自动扫描 `vllm.logits_processors` entry point 分组，并加载所有通过 entry point 注册的 logits processor。
 
-Suppose that you have developed a Python package that holds your custom logits processors. You can expose each logits processor to vLLM by adding a unique entrypoint for each logits processor to your logits processor Python package. The example below shows how to add an entrypoint to your project's `pyproject.toml` file:
+假设你开发了一个包含自定义 logits processor 的 Python 包，只需为每个 processor 配置一个 entrypoint。如在 `pyproject.toml` 文件中设置：
 
-??? code "Exposing a custom logits processor as a Python entrypoint"
+??? code "通过 Python entrypoint 暴露自定义 logits processor"
 
     ``` toml
     [project.entry-points."vllm.logits_processors"]
     dummy_logits_processor = "your.module.path:DummyLogitsProcessor"
     ```
 
-Once your package is installed, your custom logits processor will be loaded automatically whenever vLLM is initialized. You do *not* need to pass the custom logits processor to the `LLM` or `AsyncLLM` constructors or to the vLLM server explicitly at initialization time if your logits processor is exposed as an entry point.
+包安装后，每次初始化 vLLM 时都会自动加载你的自定义 logits processor。通过 entrypoint 暴露的 processor 无需再显式传递给 `LLM`、`AsyncLLM` 构造函数或 vLLM server。
 
 !!! note
-    vLLM will *always* load *all* logits processors which are exposed via entrypoints under the `vllm.logits_processors` grouping.
+    vLLM 会自动加载所有通过 `vllm.logits_processors` entry point 分组暴露的 logits processor。
 
-### Method 3 (Offline-only): Pass a Python Class Object to the vLLM Constructor
+### 方法 3（仅限离线）：将 Python 类对象直接传递给 vLLM 构造函数
 
-You can pass one or more custom logits processor class objects to the `LLM` and `AsyncLLM` constructors. This option is very flexible, as the logits processor classes may either be (1) defined locally within the same Python source file where `LLM` or `AsyncLLM` is instantiated, or (2) imported from a Python package.
+你可以将自定义 logits processor 的类对象直接传递给 `LLM` 和 `AsyncLLM` 构造函数。此方法非常灵活，类对象既可以在当前源文件中定义，也可以从其他包导入。
 
-??? code "Passing custom logits processor class object to `LLM` or `AsyncLLM` in Python"
+??? code "在 Python 中传递自定义 logits processor 类对象给 `LLM` 或 `AsyncLLM`"
 
     ``` python
-    # Import custom logits processor
+    # 从模块导入自定义 logits processor
     from some.module import DummyLogitsProcessor
 
-    # ...or...
+    # ...或...
 
-    # Define custom logits processor locally
+    # 本地定义自定义 logits processor
     from vllm.v1.sample.logits_processor import LogitsProcessor
 
     class DummyLogitsProcessor(LogitsProcessor):
-        # See DummyLogitsProcessor implementation above
+        # 参考前文 DummyLogitsProcessor 实现
         ...
 
-    # Pass class object to LLM constructor
+    # 将类对象传递给 LLM 构造函数
     llm = LLM(
         model="facebook/opt-125m",
         logits_processors=[DummyLogitsProcessor],
     )
 
-    # Pass class object to AsyncLLM constructor
-    engine_args = AsyncEngineArgs(model="facebook/opt-125m",
-                                  logits_processors=[DummyLogitsProcessor])
-    async_llm = AsyncLLM.from_engine_args(engine_args)
-    ```
-
-## Invoking a Custom Logits Processor Against a Request
-
-The design of the custom logits processor determines whether the logits processor must be enabled/disabled for a given request, and what arguments must be provided to configure the logits processor.
-
-The examples below show how a user would pass a custom argument (`target_token`) to `DummyLogitsProcessor` in order to (1) enable the logits processor for that particular request and (2) control the logits processor's behavior.
-
-??? code "vLLM REST API: configure custom logits processor for a request"
-
-    ``` bash
-    curl http://localhost:8000/v1/completions \
-        -H "Content-Type: application/json" \
-        -d '{
-            "model": "Qwen/Qwen2.5-1.5B-Instruct",
-            ...
-            "vllm_xargs": {"target_token": 67}
-        }'
-    ```
-
-??? code "OpenAI SDK: configure custom logits processor for a request"
-
-    ``` python
-    batch = await client.completions.create(
-        model="Qwen/Qwen2.5-1.5B-Instruct",
-        ...,
-        extra_body={
-            "vllm_xargs": {
-                "target_token": 67
-            }
-        }
-    )
-    ```
-
-??? code "Offline: configure custom logits processor for an `LLM` request"
-
-    ``` python
-    outputs_logitproc = llm.generate("your prompt", 
-                                     SamplingParams(...,
-                                        extra_args={"target_token": 67}))
-    ```
-
-??? code "Offline: configure custom logits processor for an `AsyncLLM` request"
-
-    ``` python
-    async for out in engine.generate(request_id="your request id",
-                                     prompt="your prompt",
-                                     sampling_params=SamplingParams(...,
-                                        extra_args={"target_token": 67})):
-
-        # Process async request outputs
-        ...
-    ```
-
-## Best Practices for Writing Custom Logits Processors
-
-Once vLLM loads a logits processor during initialization, then vLLM will invoke `update_state()` and `apply()` against that logits processor in every engine step. Both methods operate on all requests which currently reside in the vLLM persistent batch. Thus it is important to implement these methods efficiently.
-
-* Write efficient `apply()` and `update_state()` implementations in light of the fact that logits processors operate at batch granularity
-    * For example, you may be able to use efficient vectorized operations to implement `apply()` or update internal state vectors in `update_state()`
-    * However, if you think that a logits processor may be used infrequently, it may be appropriate to use a "sparse" representation of request state i.e. the class can represent request configuration using a dictionary which only stores metadata about requests that enable the logits processor
-    * **Note:** wrapped request-level logits processors do not need to implement `apply()` and `update_state()`; the default `AdapterLogitsProcessor.update_state()` implementation maintains a sparse representation of request state, wherein requests for which `new_req_logits_processor()` returns `None` are not represented in the base-class state dictionary. The default implementation of `AdapterLogitsProcessor.apply()` applies the request-level logits processor to each row of input logits sequentially and assembles the output logits tensor. If the performance of this `AdapterLogitsProcessor` default implementation is insufficient, then avoid wrapping your request-level logits processor and instead re-implement it as a `LogitsProcessor` subclass with optimized `apply()` and `update_state()` implementations that operate at batch granularity
-
-* It is up to the logits processor author to determine:
-
-    1. **The per-request attributes which configure the logits processor's behavior against that request.** Your custom logits processor's `update_state()` override determines how `SamplingParams` fields are mapped into logits processor state
-
-        * **Note:** for wrapped request-level logits processors, `new_req_logits_processor()` determines how `SamplingParams` fields are used to initialize a request-level logits processor instance.
-
-    2. **The conditions under which the logits processor is or is not enabled on a per-request basis.** Unless your intention is for the custom logits processor to act on all requests all the time, you should write your logits processor in such a way that it is possible to disable the logits processor for a given request, i.e. by defaulting an argument to `None` or by passing in a specific do-nothing argument value i.e. `0.0`. Try to save compute and memory for requests which disable the logits processor
-
-        * **Note:** for wrapped per-request logits processors, the default `AdapterLogitsProcessor.update_state()` implementation ensures that the request-level logits processor is disabled when `new_req_logits_processor()` returns `None` for that request
-
-    3. **The conditions under which the logits processor is short-circuited at the batch level.** Even if you have defined a way to disable the custom logits processor at the request level, it may be difficult to translate this into compute savings i.e. if your `update_state()` and `apply()` implementations use efficient vectorized implementations that operate on the whole persistent batch in a single command. For example, you cannot skip an entire vectorized operation in `apply()` just because one request disabled the logits processor. To save compute in the edge-case where no running requests utilize the custom logits processor, we recommend designing `apply()` to return the unmodified input tensor if all requests have the logits processor disabled. Similarly, consider whether steps can be skipped in `update_state()` if no requests enable the logits processor
-
-        * Additionally, an easy way to save compute in `update_state()` is to exit early when the `batch_update` is `None`
-
-        * **Note:** for wrapped per-request logits processors, the `AdapterLogitsProcessor` base-class implements the above optimizations by default
-
-* Ensure that the logits processor `update_state` method discards information about finished requests (i.e. requests which are replaced by an Add or which are subject to a Remove)
-
-    * **Note:** for wrapped per-request logits processors, the `AdapterLogitsProcessor` base-class handles this by default
-
-* `is_argmax_invariant()` can be hard-coded to `True` or `False` if the logits processor has consistent behavior. However the argmax invariance may also be determined programmatically (i.e. if your logits processor is user-customizable in some way that impacts whether the logits processor is argmax invariant). For this reason, `is_argmax_invariant()` is not a class method
+    # 传递类对象给 AsyncLLM 构造函数
+    engine_args = AsyncEngineArgs(model="facebook/opt

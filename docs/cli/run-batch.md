@@ -1,9 +1,9 @@
 # vllm run-batch
 
-## JSON CLI Arguments
+## JSON 命令行参数
 
 --8<-- "docs/cli/json_tip.inc.md"
 
-## Options
+## 可选项
 
 --8<-- "docs/argparse/run-batch.md"

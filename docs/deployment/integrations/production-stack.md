@@ -1,39 +1,39 @@
-# Production stack
+# 生产环境部署栈
 
-Deploying vLLM on Kubernetes is a scalable and efficient way to serve machine learning models. This guide walks you through deploying vLLM using the [vLLM production stack](https://github.com/vllm-project/production-stack). Born out of a Berkeley-UChicago collaboration, [vLLM production stack](https://github.com/vllm-project/production-stack) is an officially released, production-optimized codebase under the [vLLM project](https://github.com/vllm-project), designed for LLM deployment with:
+在 Kubernetes 上部署 vLLM，是一种高效且可扩展的机器学习模型服务方式。本指南将带你一步步使用 [vLLM production stack](https://github.com/vllm-project/production-stack) 完成部署。这个部署栈源自伯克利和芝加哥大学的合作，是 [vLLM 项目](https://github.com/vllm-project) 官方发布、专为大语言模型（LLM）生产环境优化的代码库，具备以下特点：
 
-* **Upstream vLLM compatibility** – It wraps around upstream vLLM without modifying its code.
-* **Ease of use** – Simplified deployment via Helm charts and observability through Grafana dashboards.
-* **High performance** – Optimized for LLM workloads with features like multi-model support, model-aware and prefix-aware routing, fast vLLM bootstrapping, and KV cache offloading with [LMCache](https://github.com/LMCache/LMCache), among others.
+* **与上游 vLLM 完全兼容** —— 无需修改上游 vLLM 代码，直接封装使用。
+* **简单易用** —— 通过 Helm chart 实现一键部署，并可结合 Grafana 仪表盘进行监控。
+* **高性能** —— 针对 LLM 场景优化，支持多模型、模型感知和前缀感知路由、快速启动、结合 [LMCache](https://github.com/LMCache/LMCache) 实现 KV 缓存卸载等特性。
 
-If you are new to Kubernetes, don't worry: in the vLLM production stack [repo](https://github.com/vllm-project/production-stack), we provide a step-by-step [guide](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md) and a [short video](https://www.youtube.com/watch?v=EsTJbQtzj0g) to set up everything and get started in **4 minutes**!
+如果你是 Kubernetes 新手也不用担心：在 vLLM production stack 的 [仓库](https://github.com/vllm-project/production-stack) 中，我们提供了详细的[安装教程](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)和[4 分钟上手视频](https://www.youtube.com/watch?v=EsTJbQtzj0g)，帮你快速搭建环境！
 
-## Pre-requisite
+## 前置条件
 
-Ensure that you have a running Kubernetes environment with GPU (you can follow [this tutorial](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md) to install a Kubernetes environment on a bare-medal GPU machine).
+请确保你已经拥有带有 GPU 的 Kubernetes 环境（你可以按照[本教程](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)在物理机上搭建 Kubernetes 环境）。
 
-## Deployment using vLLM production stack
+## 使用 vLLM production stack 部署
 
-The standard vLLM production stack is installed using a Helm chart. You can run this [bash script](https://github.com/vllm-project/production-stack/blob/main/utils/install-helm.sh) to install Helm on your GPU server.
+标准的 vLLM production stack 通过 Helm chart 进行安装。你可以在 GPU 服务器上运行这个 [bash 脚本](https://github.com/vllm-project/production-stack/blob/main/utils/install-helm.sh) 来安装 Helm。
 
-To install the vLLM production stack, run the following commands on your desktop:
+在你的桌面执行以下命令，即可安装 vLLM production stack：
 
 ```bash
 sudo helm repo add vllm https://vllm-project.github.io/production-stack
 sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
-This will instantiate a vLLM-production-stack-based deployment named `vllm` that runs a small LLM (Facebook opt-125M model).
+这会基于 vLLM-production-stack 启动一个名为 `vllm` 的部署，默认运行一个小型 LLM（Facebook opt-125M 模型）。
 
-### Validate Installation
+### 验证安装
 
-Monitor the deployment status using:
+你可以通过以下命令监控部署状态：
 
 ```bash
 sudo kubectl get pods
 ```
 
-And you will see that pods for the `vllm` deployment will transit to `Running` state.
+此时你会看到 `vllm` 部署下的 pod 状态变为 `Running`。
 
 ```text
 NAME                                           READY   STATUS    RESTARTS   AGE
@@ -42,23 +42,23 @@ vllm-opt125m-deployment-vllm-84dfc9bd7-vb9bs   1/1     Running   0          2m38
 ```
 
 !!! note
-    It may take some time for the containers to download the Docker images and LLM weights.
+    容器启动并下载 Docker 镜像及 LLM 权重文件可能需等待一段时间。
 
-### Send a Query to the Stack
+### 发送请求测试服务
 
-Forward the `vllm-router-service` port to the host machine:
+将 `vllm-router-service` 的端口转发到本地：
 
 ```bash
 sudo kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
-And then you can send out a query to the OpenAI-compatible API to check the available models:
+然后你可以通过 OpenAI 兼容 API 查询当前可用模型：
 
 ```bash
 curl -o- http://localhost:30080/v1/models
 ```
 
-??? console "Output"
+??? console "输出示例"
 
     ```json
     {
@@ -75,7 +75,7 @@ curl -o- http://localhost:30080/v1/models
     }
     ```
 
-To send an actual chatting request, you can issue a curl request to the OpenAI `/completion` endpoint:
+如果你想直接发送对话请求，可以调用 OpenAI `/completion` 接口：
 
 ```bash
 curl -X POST http://localhost:30080/v1/completions \
@@ -87,7 +87,7 @@ curl -X POST http://localhost:30080/v1/completions \
   }'
 ```
 
-??? console "Output"
+??? console "输出示例"
 
     ```json
     {
@@ -105,9 +105,9 @@ curl -X POST http://localhost:30080/v1/completions \
     }
     ```
 
-### Uninstall
+### 卸载部署
 
-To remove the deployment, run:
+如需移除部署，执行以下命令：
 
 ```bash
 sudo helm uninstall vllm
@@ -115,9 +115,9 @@ sudo helm uninstall vllm
 
 ---
 
-### (Advanced) Configuring vLLM production stack
+### （进阶）自定义 vLLM production stack 配置
 
-The core vLLM production stack configuration is managed with YAML. Here is the example configuration used in the installation above:
+vLLM production stack 的核心配置通过 YAML 文件进行管理。以下是前文安装过程所用的配置示例：
 
 ??? code "Yaml"
 
@@ -139,20 +139,20 @@ The core vLLM production stack configuration is managed with YAML. Here is the e
         pvcStorage: "10Gi"
     ```
 
-In this YAML configuration:
+在这个 YAML 配置中：
 
-* **`modelSpec`** includes:
-    * `name`: A nickname that you prefer to call the model.
-    * `repository`: Docker repository of vLLM.
-    * `tag`: Docker image tag.
-    * `modelURL`: The LLM model that you want to use.
-* **`replicaCount`**: Number of replicas.
-* **`requestCPU` and `requestMemory`**: Specifies the CPU and memory resource requests for the pod.
-* **`requestGPU`**: Specifies the number of GPUs required.
-* **`pvcStorage`**: Allocates persistent storage for the model.
+* **`modelSpec`** 包含：
+    * `name`：你自定义的模型别名。
+    * `repository`：vLLM 的 Docker 镜像仓库。
+    * `tag`：Docker 镜像标签。
+    * `modelURL`：你想运行的 LLM 模型。
+* **`replicaCount`**：副本数量。
+* **`requestCPU` 和 `requestMemory`**：指定 pod 需要的 CPU 和内存资源。
+* **`requestGPU`**：需要的 GPU 数量。
+* **`pvcStorage`**：为模型分配的持久化存储空间。
 
 !!! note
-    If you intend to set up two pods, please refer to this [YAML file](https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-01-2pods-minimal-example.yaml).
+    如果你希望部署两个 pod，请参考这个 [YAML 文件](https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-01-2pods-minimal-example.yaml)。
 
 !!! tip
-    vLLM production stack offers many more features (*e.g.* CPU offloading and a wide range of routing algorithms). Please check out these [examples and tutorials](https://github.com/vllm-project/production-stack/tree/main/tutorials) and our [repo](https://github.com/vllm-project/production-stack) for more details!
+    vLLM production stack 还支持更多高级特性（如 CPU 卸载、多种路由算法等）。欢迎查阅更多[示例与教程](https://github.com/vllm-project/production-stack/tree/main/tutorials)以及我们的[仓库](https://github.com/vllm-project/production-stack)了解详情！

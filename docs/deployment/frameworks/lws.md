@@ -1,18 +1,18 @@
 # LWS
 
-LeaderWorkerSet (LWS) is a Kubernetes API that aims to address common deployment patterns of AI/ML inference workloads.
-A major use case is for multi-host/multi-node distributed inference.
+LeaderWorkerSet（LWS）是一个 Kubernetes API，专门用于解决 AI/ML 推理场景下常见的部署模式。
+其中一个主要应用场景就是跨主机、多节点的分布式推理任务。
 
-vLLM can be deployed with [LWS](https://github.com/kubernetes-sigs/lws) on Kubernetes for distributed model serving.
+vLLM 可以通过在 Kubernetes 上结合 [LWS](https://github.com/kubernetes-sigs/lws) 实现分布式模型服务。
 
-## Prerequisites
+## 前置条件
 
-* At least two Kubernetes nodes, each with 8 GPUs, are required.
-* Install LWS by following the instructions found [here](https://lws.sigs.k8s.io/docs/installation/).
+* 需要至少两台 Kubernetes 节点，每台配备 8 块 GPU。
+* 按照 [官方文档](https://lws.sigs.k8s.io/docs/installation/) 的说明安装 LWS。
 
-## Deploy and Serve
+## 部署与服务
 
-Deploy the following yaml file `lws.yaml`
+部署下面的 yaml 文件 `lws.yaml`
 
 ??? code "Yaml"
 
@@ -114,13 +114,13 @@ Deploy the following yaml file `lws.yaml`
 kubectl apply -f lws.yaml
 ```
 
-Verify the status of the pods:
+查看 Pod 的运行状态：
 
 ```bash
 kubectl get pods
 ```
 
-Should get an output similar to this:
+你会看到类似如下的输出：
 
 ```bash
 NAME       READY   STATUS    RESTARTS   AGE
@@ -128,36 +128,36 @@ vllm-0     1/1     Running   0          2s
 vllm-0-1   1/1     Running   0          2s
 ```
 
-Verify that the distributed tensor-parallel inference works:
+验证分布式张量并行推理是否正常：
 
 ```bash
 kubectl logs vllm-0 |grep -i "Loading model weights took" 
 ```
 
-Should get something similar to this:
+输出内容大致如下：
 
 ```text
 INFO 05-08 03:20:24 model_runner.py:173] Loading model weights took 0.1189 GB
 (RayWorkerWrapper pid=169, ip=10.20.0.197) INFO 05-08 03:20:28 model_runner.py:173] Loading model weights took 0.1189 GB
 ```
 
-## Access ClusterIP service
+## 访问 ClusterIP 服务
 
 ```bash
-# Listen on port 8080 locally, forwarding to the targetPort of the service's port 8080 in a pod selected by the service
+# 本地监听 8080 端口，并转发到集群中被服务选中的 Pod 的 8080 端口
 kubectl port-forward svc/vllm-leader 8080:8080
 ```
 
-The output should be similar to the following:
+你会看到类似如下的输出：
 
 ```text
 Forwarding from 127.0.0.1:8080 -> 8080
 Forwarding from [::1]:8080 -> 8080
 ```
 
-## Serve the model
+## 调用模型服务
 
-Open another terminal and send a request
+打开另一个终端，发送请求：
 
 ```text
 curl http://localhost:8080/v1/completions \
@@ -170,9 +170,9 @@ curl http://localhost:8080/v1/completions \
 }'
 ```
 
-The output should be similar to the following
+输出内容大致如下
 
-??? console "Output"
+??? console "输出结果"
 
     ```text
     {

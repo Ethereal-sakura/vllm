@@ -1,10 +1,10 @@
-# Tool Calling
+# 工具调用（Tool Calling）
 
-vLLM currently supports named function calling, as well as the `auto`, `required` (as of `vllm>=0.8.3`), and `none` options for the `tool_choice` field in the chat completion API.
+vLLM 目前支持命名函数调用，并且在 chat completion API 的 `tool_choice` 字段中，还支持 `auto`、`required`（自 `vllm>=0.8.3` 起）、以及 `none` 选项。
 
-## Quickstart
+## 快速开始
 
-Start the server with tool calling enabled. This example uses Meta's Llama 3.1 8B model, so we need to use the `llama3_json` tool calling chat template from the vLLM examples directory:
+启动服务器并开启工具调用功能。本示例使用 Meta 的 Llama 3.1 8B 模型，因此需要使用 vLLM 示例目录中的 `llama3_json` 工具调用聊天模板：
 
 ```bash
 vllm serve meta-llama/Llama-3.1-8B-Instruct \
@@ -13,7 +13,7 @@ vllm serve meta-llama/Llama-3.1-8B-Instruct \
     --chat-template examples/tool_chat_template_llama3.1_json.jinja
 ```
 
-Next, make a request that triggers the model to use the available tools:
+接下来，发送一个请求，触发模型调用可用工具：
 
 ??? code
 
@@ -32,11 +32,11 @@ Next, make a request that triggers the model to use the available tools:
             "type": "function",
             "function": {
                 "name": "get_weather",
-                "description": "Get the current weather in a given location",
+                "description": "获取指定位置的当前天气",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "location": {"type": "string", "description": "City and state, e.g., 'San Francisco, CA'"},
+                        "location": {"type": "string", "description": "城市和州，例如 'San Francisco, CA'"},
                         "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
                     },
                     "required": ["location", "unit"],
@@ -58,7 +58,7 @@ Next, make a request that triggers the model to use the available tools:
     print(f"Result: {tool_functions[tool_call.name](**json.loads(tool_call.arguments))}")
     ```
 
-Example output:
+示例输出：
 
 ```text
 Function called: get_weather
@@ -66,387 +66,269 @@ Arguments: {"location": "San Francisco, CA", "unit": "fahrenheit"}
 Result: Getting the weather for San Francisco, CA in fahrenheit...
 ```
 
-This example demonstrates:
+该示例演示了以下流程：
 
-* Setting up the server with tool calling enabled
-* Defining an actual function to handle tool calls
-* Making a request with `tool_choice="auto"`
-* Handling the structured response and executing the corresponding function
+* 启用工具调用功能启动服务器
+* 定义实际的函数来处理工具调用
+* 使用 `tool_choice="auto"` 方式发起请求
+* 处理结构化响应并执行对应函数
 
-You can also specify a particular function using named function calling by setting `tool_choice={"type": "function", "function": {"name": "get_weather"}}`. Note that this will use the structured outputs backend - so the first time this is used, there will be several seconds of latency (or more) as the FSM is compiled for the first time before it is cached for subsequent requests.
+你也可以通过设置 `tool_choice={"type": "function", "function": {"name": "get_weather"}}` 来指定某个具体函数进行调用。需要注意的是，这种方式会使用结构化输出后端，因此首次使用时会有几秒甚至更长的延迟，因为 FSM 会首次编译并缓存，之后请求会更快。
 
-Remember that it's the caller's responsibility to:
+请记住，调用方需要负责：
 
-1. Define appropriate tools in the request
-2. Include relevant context in the chat messages
-3. Handle the tool calls in your application logic
+1. 在请求中定义合适的工具
+2. 在聊天消息中提供相关上下文
+3. 在应用逻辑里处理工具调用
 
-For more advanced usage, including parallel tool calls and different model-specific parsers, see the sections below.
+如需更高级的用法，包括并行工具调用和不同模型专用解析器，请参考下方相关章节。
 
-## Named Function Calling
+## 命名函数调用
 
-vLLM supports named function calling in the chat completion API by default. This should work with most structured outputs backends supported by vLLM. You are guaranteed a validly-parsable function call - not a
-high-quality one.
+vLLM 默认支持在 chat completion API 中进行命名函数调用。绝大多数 vLLM 支持的结构化输出后端都可以正常工作。你可以获得格式正确、可解析的函数调用——但并不保证调用质量很高。
 
-vLLM will use structured outputs to ensure the response matches the tool parameter object defined by the JSON schema in the `tools` parameter.
-For best results, we recommend ensuring that the expected output format / schema is specified in the prompt to ensure that the model's intended generation is aligned with the schema that it's being forced to generate by the structured outputs backend.
+vLLM 会用结构化输出确保响应内容符合在 `tools` 参数中通过 JSON schema 定义的工具参数对象。为获得最佳效果，建议在 prompt 中指定期望的输出格式或 schema，这样模型生成内容时会更贴合结构化输出后端要求的 schema。
 
-To use a named function, you need to define the functions in the `tools` parameter of the chat completion request, and
-specify the `name` of one of the tools in the `tool_choice` parameter of the chat completion request.
+要使用指定的函数，只需在 chat completion 请求的 `tools` 参数中定义函数，并在 `tool_choice` 参数里指定要调用的工具 `name`。
 
-## Required Function Calling
+## 必须调用函数
 
-vLLM supports the `tool_choice='required'` option in the chat completion API. Similar to the named function calling, it also uses structured outputs, so this is enabled by default and will work with any supported model. However, support for alternative decoding backends are on the [roadmap](../usage/v1_guide.md#features) for the V1 engine.
+vLLM 支持在 chat completion API 中使用 `tool_choice='required'` 选项。和命名函数调用类似，内部也是用结构化输出，因此默认启用，所有支持的模型都能用。未来也会支持其他解码后端，具体进展可参考[路线图](../usage/v1_guide.md#features)。
 
-When tool_choice='required' is set, the model is guaranteed to generate one or more tool calls based on the specified tool list in the `tools` parameter. The number of tool calls depends on the user's query. The output format strictly follows the schema defined in the `tools` parameter.
+当设置 `tool_choice='required'` 时，模型会根据 `tools` 参数中的工具列表，保证生成一个或多个工具调用，具体数量取决于用户的请求。输出格式会严格遵循 `tools` 参数中定义的 schema。
 
-## None Function Calling
+## 禁用工具调用
 
-vLLM supports the `tool_choice='none'` option in the chat completion API. When this option is set, the model will not generate any tool calls and will respond with regular text content only, even if tools are defined in the request.
+vLLM 支持在 chat completion API 中将 `tool_choice='none'`，此时模型不会生成任何工具调用，只会返回普通文本内容，即便请求中定义了工具。
 
 !!! note
-    When tools are specified in the request, vLLM includes tool definitions in the prompt by default, regardless of the `tool_choice` setting. To exclude tool definitions when `tool_choice='none'`, use the `--exclude-tools-when-tool-choice-none` option.
+    如果请求中有定义工具，vLLM 默认会将工具定义加入 prompt，无论 `tool_choice` 是否设置为 `none`。如果希望在 `tool_choice='none'` 时排除工具定义，可以使用 `--exclude-tools-when-tool-choice-none` 选项。
 
-## Automatic Function Calling
+## 自动工具调用
 
-To enable this feature, you should set the following flags:
+启用自动工具调用功能时需要设置以下参数：
 
-* `--enable-auto-tool-choice` -- **mandatory** Auto tool choice. It tells vLLM that you want to enable the model to generate its own tool calls when it
-deems appropriate.
-* `--tool-call-parser` -- select the tool parser to use (listed below). Additional tool parsers
-will continue to be added in the future. You can also register your own tool parsers in the `--tool-parser-plugin`.
-* `--tool-parser-plugin` -- **optional** tool parser plugin used to register user defined tool parsers into vllm, the registered tool parser name can be specified in `--tool-call-parser`.
-* `--chat-template` -- **optional** for auto tool choice. It's the path to the chat template which handles `tool`-role messages and `assistant`-role messages
-that contain previously generated tool calls. Hermes, Mistral and Llama models have tool-compatible chat templates in their
-`tokenizer_config.json` files, but you can specify a custom template. This argument can be set to `tool_use` if your model has a tool use-specific chat
-template configured in the `tokenizer_config.json`. In this case, it will be used per the `transformers` specification. More on this [here](https://huggingface.co/docs/transformers/en/chat_templating#why-do-some-models-have-multiple-templates)
-from HuggingFace; and you can find an example of this in a `tokenizer_config.json` [here](https://huggingface.co/NousResearch/Hermes-2-Pro-Llama-3-8B/blob/main/tokenizer_config.json).
+* `--enable-auto-tool-choice` —— **必需**，自动工具选择，允许模型在它认为需要时自动生成工具调用。
+* `--tool-call-parser` —— 选择工具解析器（见下方列表）。未来会不断增加更多工具解析器，也可以用 `--tool-parser-plugin` 注册自定义解析器。
+* `--tool-parser-plugin` —— **可选**，用于注册用户自定义工具解析器到 vLLM，注册后可以在 `--tool-call-parser` 指定名称。
+* `--chat-template` —— **可选**，用于自动工具选择时指定聊天模板，模板会处理 `tool` 角色消息和 `assistant` 角色消息里的工具调用。Hermes、Mistral 和 Llama 等模型在它们的 `tokenizer_config.json` 文件中已包含兼容工具调用的聊天模板，当然也可以指定自定义模板。如果你的模型有专用的工具调用聊天模板，可以将此参数设为 `tool_use`，此时会按 `transformers` 规范使用。更多信息可参考 [HuggingFace 文档](https://huggingface.co/docs/transformers/en/chat_templating#why-do-some-models-have-multiple-templates)；示例见 [tokenizer_config.json](https://huggingface.co/NousResearch/Hermes-2-Pro-Llama-3-8B/blob/main/tokenizer_config.json)。
 
-If your favorite tool-calling model is not supported, please feel free to contribute a parser & tool use chat template!
+如果你喜欢的工具调用模型还不支持，欢迎贡献解析器和聊天模板！
 
-### Hermes Models (`hermes`)
+### Hermes 模型（`hermes`）
 
-All Nous Research Hermes-series models newer than Hermes 2 Pro should be supported.
+所有 Nous Research Hermes 系列中 Hermes 2 Pro 及之后的模型都支持。
 
 * `NousResearch/Hermes-2-Pro-*`
 * `NousResearch/Hermes-2-Theta-*`
 * `NousResearch/Hermes-3-*`
 
-_Note that the Hermes 2 **Theta** models are known to have degraded tool call quality and capabilities due to the merge
-step in their creation_.
+_注意 Hermes 2 **Theta** 系列由于合并步骤影响，工具调用质量和能力有所下降。_
 
-Flags: `--tool-call-parser hermes`
+参数：`--tool-call-parser hermes`
 
-### Mistral Models (`mistral`)
+### Mistral 模型（`mistral`）
 
-Supported models:
+支持的模型：
 
-* `mistralai/Mistral-7B-Instruct-v0.3` (confirmed)
-* Additional mistral function-calling models are compatible as well.
+* `mistralai/Mistral-7B-Instruct-v0.3`（已确认）
+* 其他支持函数调用的 Mistral 系列模型也兼容。
 
-Known issues:
+已知问题：
 
-1. Mistral 7B struggles to generate parallel tool calls correctly.
-2. **For Transformers tokenization backend only**: Mistral's `tokenizer_config.json` chat template requires tool call IDs that are exactly 9 digits, which is
-   much shorter than what vLLM generates. Since an exception is thrown when this condition
-   is not met, the following additional chat templates are provided:
+1. Mistral 7B 在生成并行工具调用时有困难。
+2. **仅限 Transformers 分词后端**：Mistral 的 `tokenizer_config.json` 聊天模板要求工具调用 ID 必须是 9 位数字，而 vLLM 生成的更长。如果不满足会报错，建议使用以下模板：
 
-    * [examples/tool_chat_template_mistral.jinja](../../examples/tool_chat_template_mistral.jinja) - this is the "official" Mistral chat template, but tweaked so that
-      it works with vLLM's tool call IDs (provided `tool_call_id` fields are truncated to the last 9 digits)
-    * [examples/tool_chat_template_mistral_parallel.jinja](../../examples/tool_chat_template_mistral_parallel.jinja) - this is a "better" version that adds a tool-use system prompt
-      when tools are provided, that results in much better reliability when working with parallel tool calling.
+    * [examples/tool_chat_template_mistral.jinja](../../examples/tool_chat_template_mistral.jinja) —— 官方聊天模板，已调整为支持 vLLM 的工具调用 ID（会截取最后 9 位）。
+    * [examples/tool_chat_template_mistral_parallel.jinja](../../examples/tool_chat_template_mistral_parallel.jinja) —— 进一步增强，并在有工具时添加工具用法提示，提升并行工具调用的稳定性。
 
-Recommended flags:
+推荐参数：
 
-1. To use [mistral-common](https://github.com/mistralai/mistral-common) the official Mistral tokenization backend:
+1. 使用官方 Mistral 分词后端 [mistral-common](https://github.com/mistralai/mistral-common)：
 
     `--tokenizer_mode mistral --config_format mistral --load_format mistral --tool-call-parser mistral`
 
-2. To use the default Transformers tokenization backend:
+2. 使用默认 Transformers 分词后端：
     `--tool-call-parser mistral --chat-template examples/tool_chat_template_mistral_parallel.jinja`
 
-### Llama Models (`llama3_json`)
+### Llama 模型（`llama3_json`）
 
-Supported models:
+支持的模型：
 
-All Llama 3.1, 3.2 and 4 models should be supported.
+所有 Llama 3.1、3.2 和 4 系列均支持。
 
 * `meta-llama/Llama-3.1-*`
 * `meta-llama/Llama-3.2-*`
 * `meta-llama/Llama-4-*`
 
-The tool calling that is supported is the [JSON-based tool calling](https://llama.meta.com/docs/model-cards-and-prompt-formats/llama3_1/#json-based-tool-calling). For [pythonic tool calling](https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/text_prompt_format.md#zero-shot-function-calling) introduced by the Llama-3.2 models, see the `pythonic` tool parser below. As for Llama 4 models, it is recommended to use the `llama4_pythonic` tool parser.
+支持的工具调用格式为 [基于 JSON 的工具调用](https://llama.meta.com/docs/model-cards-and-prompt-formats/llama3_1/#json-based-tool-calling)。对于 Llama-3.2 新增的 [Pythonic 工具调用](https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/text_prompt_format.md#zero-shot-function-calling)，请参考下方 `pythonic` 工具解析器。Llama 4 推荐使用 `llama4_pythonic` 工具解析器。
 
-Other tool calling formats like the built-in python tool calling or custom tool calling are not supported.
+其他如内置 python 工具调用或自定义工具调用暂不支持。
 
-Known issues:
+已知问题：
 
-1. Parallel tool calls are not supported for Llama 3, but it is supported in Llama 4 models.
-2. The model can generate parameters in an incorrect format, such as generating
-   an array serialized as string instead of an array.
+1. Llama 3 不支持并行工具调用，但 Llama 4 支持。
+2. 模型有时会生成参数格式错误，比如把数组序列化为字符串而不是数组。
 
-VLLM provides two JSON-based chat templates for Llama 3.1 and 3.2:
+vLLM 针对 Llama 3.1 和 3.2 提供了两套 JSON 聊天模板：
 
-* [examples/tool_chat_template_llama3.1_json.jinja](../../examples/tool_chat_template_llama3.1_json.jinja) - this is the "official" chat template for the Llama 3.1
-models, but tweaked so that it works better with vLLM.
-* [examples/tool_chat_template_llama3.2_json.jinja](../../examples/tool_chat_template_llama3.2_json.jinja) - this extends upon the Llama 3.1 chat template by adding support for
-images.
+* [examples/tool_chat_template_llama3.1_json.jinja](../../examples/tool_chat_template_llama3.1_json.jinja) ——这是 Llama 3.1 官方模板的增强版，更适配 vLLM。
+* [examples/tool_chat_template_llama3.2_json.jinja](../../examples/tool_chat_template_llama3.2_json.jinja) ——在 3.1 基础上增加了图像支持。
 
-Recommended flags: `--tool-call-parser llama3_json --chat-template {see_above}`
+推荐参数：`--tool-call-parser llama3_json --chat-template {见上方}`
 
-VLLM also provides a pythonic and JSON-based chat template for Llama 4, but pythonic tool calling is recommended:
+Llama 4 还提供了 Pythonic 与 JSON 聊天模板，推荐使用 Pythonic 工具调用：
 
-* [examples/tool_chat_template_llama4_pythonic.jinja](../../examples/tool_chat_template_llama4_pythonic.jinja) - this is based on the [official chat template](https://www.llama.com/docs/model-cards-and-prompt-formats/llama4/) for the Llama 4 models.
+* [examples/tool_chat_template_llama4_pythonic.jinja](../../examples/tool_chat_template_llama4_pythonic.jinja) ——基于 [官方聊天模板](https://www.llama.com/docs/model-cards-and-prompt-formats/llama4/)。
 
-For Llama 4 model, use `--tool-call-parser llama4_pythonic --chat-template examples/tool_chat_template_llama4_pythonic.jinja`.
+Llama 4 推荐使用 `--tool-call-parser llama4_pythonic --chat-template examples/tool_chat_template_llama4_pythonic.jinja`。
 
 ### IBM Granite
 
-Supported models:
+支持的模型：
 
-* `ibm-granite/granite-4.0-h-small` and other Granite 4.0 models
+* `ibm-granite/granite-4.0-h-small` 及其他 Granite 4.0 系列
 
-    Recommended flags: `--tool-call-parser hermes`
+    推荐参数：`--tool-call-parser hermes`
 
 * `ibm-granite/granite-3.0-8b-instruct`
 
-    Recommended flags: `--tool-call-parser granite --chat-template examples/tool_chat_template_granite.jinja`
+    推荐参数：`--tool-call-parser granite --chat-template examples/tool_chat_template_granite.jinja`
 
-    [examples/tool_chat_template_granite.jinja](../../examples/tool_chat_template_granite.jinja): this is a modified chat template from the original on Hugging Face. Parallel function calls are supported.
+    [examples/tool_chat_template_granite.jinja](../../examples/tool_chat_template_granite.jinja)：此模板基于 Hugging Face 原版修改，支持并行函数调用。
 
 * `ibm-granite/granite-3.1-8b-instruct`
 
-    Recommended flags: `--tool-call-parser granite`
+    推荐参数：`--tool-call-parser granite`
 
-    The chat template from Huggingface can be used directly. Parallel function calls are supported.
+    可直接使用 Huggingface 的聊天模板，支持并行函数调用。
 
 * `ibm-granite/granite-20b-functioncalling`
 
-    Recommended flags: `--tool-call-parser granite-20b-fc --chat-template examples/tool_chat_template_granite_20b_fc.jinja`
+    推荐参数：`--tool-call-parser granite-20b-fc --chat-template examples/tool_chat_template_granite_20b_fc.jinja`
 
-    [examples/tool_chat_template_granite_20b_fc.jinja](../../examples/tool_chat_template_granite_20b_fc.jinja): this is a modified chat template from the original on Hugging Face, which is not vLLM-compatible. It blends function description elements from the Hermes template and follows the same system prompt as "Response Generation" mode from [the paper](https://arxiv.org/abs/2407.00121). Parallel function calls are supported.
+    [examples/tool_chat_template_granite_20b_fc.jinja](../../examples/tool_chat_template_granite_20b_fc.jinja)：此模板基于 Hugging Face 原版修改，融合 Hermes 模板的函数描述元素，并遵循论文中“Response Generation”模式的系统提示。支持并行函数调用。
 
-### InternLM Models (`internlm`)
+### InternLM 模型（`internlm`）
 
-Supported models:
+支持的模型：
 
-* `internlm/internlm2_5-7b-chat` (confirmed)
-* Additional internlm2.5 function-calling models are compatible as well
+* `internlm/internlm2_5-7b-chat`（已确认）
+* 其他支持函数调用的 internlm2.5 模型也兼容
 
-Known issues:
+已知问题：
 
-* Although this implementation also supports InternLM2, the tool call results are not stable when testing with the `internlm/internlm2-chat-7b` model.
+* 该实现也支持 InternLM2，但在 `internlm/internlm2-chat-7b` 测试时工具调用结果不够稳定。
 
-Recommended flags: `--tool-call-parser internlm --chat-template examples/tool_chat_template_internlm2_tool.jinja`
+推荐参数：`--tool-call-parser internlm --chat-template examples/tool_chat_template_internlm2_tool.jinja`
 
-### Jamba Models (`jamba`)
+### Jamba 模型（`jamba`）
 
-AI21's Jamba-1.5 models are supported.
+AI21 的 Jamba-1.5 系列模型已支持。
 
 * `ai21labs/AI21-Jamba-1.5-Mini`
 * `ai21labs/AI21-Jamba-1.5-Large`
 
-Flags: `--tool-call-parser jamba`
+参数：`--tool-call-parser jamba`
 
-### xLAM Models (`xlam`)
+### xLAM 模型（`xlam`）
 
-The xLAM tool parser is designed to support models that generate tool calls in various JSON formats. It detects function calls in several different output styles:
+xLAM 工具解析器适用于多种 JSON 格式工具调用模型，能识别多种输出风格：
 
-1. Direct JSON arrays: Output strings that are JSON arrays starting with `[` and ending with `]`
-2. Thinking tags: Using `<think>...</think>` tags containing JSON arrays
-3. Code blocks: JSON in code blocks (```json ...```)
-4. Tool calls tags: Using `[TOOL_CALLS]` or `<tool_call>...</tool_call>` tags
+1. 直接 JSON 数组：输出字符串是以 `[` 开头、`]` 结尾的 JSON 数组
+2. 思考标签：使用 `<think>...</think>` 标签包裹 JSON 数组
+3. 代码块：在代码块 (```json ...```) 中的 JSON
+4. 工具调用标签：用 `[TOOL_CALLS]` 或 `<tool_call>...</tool_call>` 标签
 
-Parallel function calls are supported, and the parser can effectively separate text content from tool calls.
+支持并行函数调用，且能有效区分文本内容与工具调用。
 
-Supported models:
+已支持模型：
 
-* Salesforce Llama-xLAM models: `Salesforce/Llama-xLAM-2-8B-fc-r`, `Salesforce/Llama-xLAM-2-70B-fc-r`
-* Qwen-xLAM models: `Salesforce/xLAM-1B-fc-r`, `Salesforce/xLAM-3B-fc-r`, `Salesforce/Qwen-xLAM-32B-fc-r`
+* Salesforce Llama-xLAM 系列：`Salesforce/Llama-xLAM-2-8B-fc-r`、`Salesforce/Llama-xLAM-2-70B-fc-r`
+* Qwen-xLAM 系列：`Salesforce/xLAM-1B-fc-r`、`Salesforce/xLAM-3B-fc-r`、`Salesforce/Qwen-xLAM-32B-fc-r`
 
-Flags:
+参数：
 
-* For Llama-based xLAM models: `--tool-call-parser xlam --chat-template examples/tool_chat_template_xlam_llama.jinja`
-* For Qwen-based xLAM models: `--tool-call-parser xlam --chat-template examples/tool_chat_template_xlam_qwen.jinja`
+* Llama 系列 xLAM：`--tool-call-parser xlam --chat-template examples/tool_chat_template_xlam_llama.jinja`
+* Qwen 系列 xLAM：`--tool-call-parser xlam --chat-template examples/tool_chat_template_xlam_qwen.jinja`
 
-### Qwen Models
+### Qwen 模型
 
-For Qwen2.5, the chat template in tokenizer_config.json has already included support for the Hermes-style tool use. Therefore, you can use the `hermes` parser to enable tool calls for Qwen models. For more detailed information, please refer to the official [Qwen documentation](https://qwen.readthedocs.io/en/latest/framework/function_call.html#vllm)
+对于 Qwen2.5，tokenizer_config.json 内置了 Hermes 风格工具调用支持，因此可以用 `hermes` 解析器开启工具调用。更多详情请参考官方 [Qwen 文档](https://qwen.readthedocs.io/en/latest/framework/function_call.html#vllm)
 
 * `Qwen/Qwen2.5-*`
 * `Qwen/QwQ-32B`
 
-Flags: `--tool-call-parser hermes`
+参数：`--tool-call-parser hermes`
 
-### MiniMax Models (`minimax_m1`)
+### MiniMax 模型（`minimax_m1`）
 
-Supported models:
+支持的模型：
 
-* `MiniMaxAi/MiniMax-M1-40k` (use with [examples/tool_chat_template_minimax_m1.jinja](../../examples/tool_chat_template_minimax_m1.jinja))
-* `MiniMaxAi/MiniMax-M1-80k` (use with [examples/tool_chat_template_minimax_m1.jinja](../../examples/tool_chat_template_minimax_m1.jinja))
+* `MiniMaxAi/MiniMax-M1-40k`（须搭配 [examples/tool_chat_template_minimax_m1.jinja](../../examples/tool_chat_template_minimax_m1.jinja) 使用）
+* `MiniMaxAi/MiniMax-M1-80k`（须搭配 [examples/tool_chat_template_minimax_m1.jinja](../../examples/tool_chat_template_minimax_m1.jinja) 使用）
 
-Flags: `--tool-call-parser minimax --chat-template examples/tool_chat_template_minimax_m1.jinja`
+参数：`--tool-call-parser minimax --chat-template examples/tool_chat_template_minimax_m1.jinja`
 
-### DeepSeek-V3 Models (`deepseek_v3`)
+### DeepSeek-V3 模型（`deepseek_v3`）
 
-Supported models:
+支持的模型：
 
-* `deepseek-ai/DeepSeek-V3-0324` (use with [examples/tool_chat_template_deepseekv3.jinja](../../examples/tool_chat_template_deepseekv3.jinja))
-* `deepseek-ai/DeepSeek-R1-0528` (use with [examples/tool_chat_template_deepseekr1.jinja](../../examples/tool_chat_template_deepseekr1.jinja))
+* `deepseek-ai/DeepSeek-V3-0324`（须搭配 [examples/tool_chat_template_deepseekv3.jinja](../../examples/tool_chat_template_deepseekv3.jinja) 使用）
+* `deepseek-ai/DeepSeek-R1-0528`（须搭配 [examples/tool_chat_template_deepseekr1.jinja](../../examples/tool_chat_template_deepseekr1.jinja) 使用）
 
-Flags: `--tool-call-parser deepseek_v3 --chat-template {see_above}`
+参数：`--tool-call-parser deepseek_v3 --chat-template {见上方}`
 
-### DeepSeek-V3.1 Models (`deepseek_v31`)
+### DeepSeek-V3.1 模型（`deepseek_v31`）
 
-Supported models:
+支持的模型：
 
-* `deepseek-ai/DeepSeek-V3.1` (use with [examples/tool_chat_template_deepseekv31.jinja](../../examples/tool_chat_template_deepseekv31.jinja))
+* `deepseek-ai/DeepSeek-V3.1`（须搭配 [examples/tool_chat_template_deepseekv31.jinja](../../examples/tool_chat_template_deepseekv31.jinja) 使用）
 
-Flags: `--tool-call-parser deepseek_v31 --chat-template {see_above}`
+参数：`--tool-call-parser deepseek_v31 --chat-template {见上方}`
 
-### Kimi-K2 Models (`kimi_k2`)
+### Kimi-K2 模型（`kimi_k2`）
 
-Supported models:
+支持的模型：
 
 * `moonshotai/Kimi-K2-Instruct`
 
-Flags: `--tool-call-parser kimi_k2`
+参数：`--tool-call-parser kimi_k2`
 
-### Hunyuan Models (`hunyuan_a13b`)
+### Hunyuan 模型（`hunyuan_a13b`）
 
-Supported models:
+支持的模型：
 
-* `tencent/Hunyuan-A13B-Instruct` (The chat template is already included in the Hugging Face model files.)
+* `tencent/Hunyuan-A13B-Instruct`（聊天模板已包含在 Hugging Face 模型文件中）
 
-Flags:
+参数：
 
-* For non-reasoning: `--tool-call-parser hunyuan_a13b`
-* For reasoning: `--tool-call-parser hunyuan_a13b --reasoning-parser hunyuan_a13b`
+* 非推理模式：`--tool-call-parser hunyuan_a13b`
+* 推理模式：`--tool-call-parser hunyuan_a13b --reasoning-parser hunyuan_a13b`
 
-### LongCat-Flash-Chat Models (`longcat`)
+### LongCat-Flash-Chat 模型（`longcat`）
 
-Supported models:
+支持的模型：
 
 * `meituan-longcat/LongCat-Flash-Chat`
 * `meituan-longcat/LongCat-Flash-Chat-FP8`
 
-Flags: `--tool-call-parser longcat`
+参数：`--tool-call-parser longcat`
 
-### GLM-4.5 Models (`glm45`)
+### GLM-4.5 模型（`glm45`）
 
-Supported models:
+支持的模型：
 
 * `zai-org/GLM-4.5`
 * `zai-org/GLM-4.5-Air`
 * `zai-org/GLM-4.6`
 * `zai-org/GLM-4.6-Air`
 
-Flags: `--tool-call-parser glm45`
+参数：`--tool-call-parser glm45`
 
-### Qwen3-Coder Models (`qwen3_xml`)
+### Qwen3-Coder 模型（`qwen3_xml`）
 
-Supported models:
+支持的模型：
 
 * `Qwen/Qwen3-480B-A35B-Instruct`
-* `Qwen/Qwen3-Coder-30B-A3B-Instruct`
-
-Flags: `--tool-call-parser qwen3_xml`
-
-### Olmo 3 Models (`olmo3`)
-
-Olmo 3 models output tool calls in a format that is very similar to the one expected by the `pythonic` parser (see below), with a few differences. Each tool call is a pythonic string, but the parallel tool calls are newline-delimited, and the calls are wrapped within XML tags as `<function_calls>..</function_calls>`. In addition, the parser also allows JSON boolean and null literals (`true`, `false`, and `null`) in addition to the pythonic ones (`True`, `False`, and `None`).
-
-Supported models:
-
-* TODO (will be updated after Olmo 3 release)
-
-Flags: `--tool-call-parser olmo3`
-
-### Models with Pythonic Tool Calls (`pythonic`)
-
-A growing number of models output a python list to represent tool calls instead of using JSON. This has the advantage of inherently supporting parallel tool calls and removing ambiguity around the JSON schema required for tool calls. The `pythonic` tool parser can support such models.
-
-As a concrete example, these models may look up the weather in San Francisco and Seattle by generating:
-
-```python
-[get_weather(city='San Francisco', metric='celsius'), get_weather(city='Seattle', metric='celsius')]
-```
-
-Limitations:
-
-* The model must not generate both text and tool calls in the same generation. This may not be hard to change for a specific model, but the community currently lacks consensus on which tokens to emit when starting and ending tool calls.  (In particular, the Llama 3.2 models emit no such tokens.)
-* Llama's smaller models struggle to use tools effectively.
-
-Example supported models:
-
-* `meta-llama/Llama-3.2-1B-Instruct` ⚠️ (use with [examples/tool_chat_template_llama3.2_pythonic.jinja](../../examples/tool_chat_template_llama3.2_pythonic.jinja))
-* `meta-llama/Llama-3.2-3B-Instruct` ⚠️ (use with [examples/tool_chat_template_llama3.2_pythonic.jinja](../../examples/tool_chat_template_llama3.2_pythonic.jinja))
-* `Team-ACE/ToolACE-8B` (use with [examples/tool_chat_template_toolace.jinja](../../examples/tool_chat_template_toolace.jinja))
-* `fixie-ai/ultravox-v0_4-ToolACE-8B` (use with [examples/tool_chat_template_toolace.jinja](../../examples/tool_chat_template_toolace.jinja))
-* `meta-llama/Llama-4-Scout-17B-16E-Instruct` ⚠️ (use with [examples/tool_chat_template_llama4_pythonic.jinja](../../examples/tool_chat_template_llama4_pythonic.jinja))
-* `meta-llama/Llama-4-Maverick-17B-128E-Instruct` ⚠️ (use with [examples/tool_chat_template_llama4_pythonic.jinja](../../examples/tool_chat_template_llama4_pythonic.jinja))
-
-Flags: `--tool-call-parser pythonic --chat-template {see_above}`
-
-!!! warning
-    Llama's smaller models frequently fail to emit tool calls in the correct format. Results may vary depending on the model.
-
-## How to Write a Tool Parser Plugin
-
-A tool parser plugin is a Python file containing one or more ToolParser implementations. You can write a ToolParser similar to the `Hermes2ProToolParser` in [vllm/entrypoints/openai/tool_parsers/hermes_tool_parser.py](../../vllm/entrypoints/openai/tool_parsers/hermes_tool_parser.py).
-
-Here is a summary of a plugin file:
-
-??? code
-
-    ```python
-
-    # import the required packages
-
-    # define a tool parser and register it to vllm
-    # the name list in register_module can be used
-    # in --tool-call-parser. you can define as many
-    # tool parsers as you want here.
-    @ToolParserManager.register_module(["example"])
-    class ExampleToolParser(ToolParser):
-        def __init__(self, tokenizer: AnyTokenizer):
-            super().__init__(tokenizer)
-
-        # adjust request. e.g.: set skip special tokens
-        # to False for tool call output.
-        def adjust_request(self, request: ChatCompletionRequest) -> ChatCompletionRequest:
-            return request
-
-        # implement the tool call parse for stream call
-        def extract_tool_calls_streaming(
-            self,
-            previous_text: str,
-            current_text: str,
-            delta_text: str,
-            previous_token_ids: Sequence[int],
-            current_token_ids: Sequence[int],
-            delta_token_ids: Sequence[int],
-            request: ChatCompletionRequest,
-        ) -> DeltaMessage | None:
-            return delta
-
-        # implement the tool parse for non-stream call
-        def extract_tool_calls(
-            self,
-            model_output: str,
-            request: ChatCompletionRequest,
-        ) -> ExtractedToolCallInformation:
-            return ExtractedToolCallInformation(tools_called=False,
-                                                tool_calls=[],
-                                                content=text)
-
-    ```
-
-Then you can use this plugin in the command line like this.
-
-```bash
-    --enable-auto-tool-choice \
-    --tool-parser-plugin <absolute path of the plugin file>
-    --tool-call-parser example \
-    --chat-template <your chat template> \
-```
+* `

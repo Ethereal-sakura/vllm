@@ -1,9 +1,9 @@
 # vllm serve
 
-## JSON CLI Arguments
+## JSON 命令行参数
 
 --8<-- "docs/cli/json_tip.inc.md"
 
-## Options
+## 选项
 
 --8<-- "docs/argparse/serve.md"

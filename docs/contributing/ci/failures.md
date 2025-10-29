@@ -1,48 +1,46 @@
-# CI Failures
+# CI 失败处理
 
-What should I do when a CI job fails on my PR, but I don't think my PR caused
-the failure?
+如果我的 PR（Pull Request）触发了 CI（持续集成 Continuous Integration）任务失败，但我认为不是我的原因导致的，该怎么办？
 
-- Check the dashboard of current CI test failures:  
-  👉 [CI Failures Dashboard](https://github.com/orgs/vllm-project/projects/20)
+- 请先查看当前 CI 测试失败的看板：  
+  👉 [CI 失败看板](https://github.com/orgs/vllm-project/projects/20)
 
-- If your failure **is already listed**, it's likely unrelated to your PR.
-  Help fixing it is always welcome!
-    - Leave comments with links to additional instances of the failure.
-    - React with a 👍 to signal how many are affected.
+- 如果你的失败**已经在列表中**，那很可能与你的 PR 无关。当然，非常欢迎你参与修复！
+    - 可以在相关问题下留言，提供更多失败实例的链接。
+    - 给已有的问题点个 👍，表示有更多人受到影响。
 
-- If your failure **is not listed**, you should **file an issue**.
+- 如果你的失败**没有在列表中**，请**新建一个 issue** 进行反馈。
 
-## Filing a CI Test Failure Issue
+## 如何新建 CI 测试失败的 Issue
 
-- **File a bug report:**  
-    👉 [New CI Failure Report](https://github.com/vllm-project/vllm/issues/new?template=450-ci-failure.yml)
+- **提交 Bug 报告：**  
+    👉 [新建 CI 失败报告](https://github.com/vllm-project/vllm/issues/new?template=450-ci-failure.yml)
 
-- **Use this title format:**
+- **标题请使用以下格式：**
 
     ```text
     [CI Failure]: failing-test-job - regex/matching/failing:test
     ```
 
-- **For the environment field:**
+- **环境字段建议填写：**
 
     ```text
     Still failing on main as of commit abcdef123
     ```
 
-- **In the description, include failing tests:**
+- **描述中请包含出错的测试项：**
 
     ```text
-    FAILED failing/test.py:failing_test1 - Failure description
-    FAILED failing/test.py:failing_test2 - Failure description
+    FAILED failing/test.py:failing_test1 - 失败描述
+    FAILED failing/test.py:failing_test2 - 失败描述
     https://github.com/orgs/vllm-project/projects/20
     https://github.com/vllm-project/vllm/issues/new?template=400-bug-report.yml
-    FAILED failing/test.py:failing_test3 - Failure description
+    FAILED failing/test.py:failing_test3 - 失败描述
     ```
 
-- **Attach logs** (collapsible section example):
+- **请附上日志**（可折叠的日志示例）：
     <details>
-    <summary>Logs:</summary>
+    <summary>日志：</summary>
 
     ```text
     ERROR 05-20 03:26:38 [dump_input.py:68] Dumping input data
@@ -51,18 +49,18 @@ the failure?
       File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 203, in execute_model  
         return self.model_executor.execute_model(scheduler_output)
     ...
-    FAILED failing/test.py:failing_test1 - Failure description
-    FAILED failing/test.py:failing_test2 - Failure description
-    FAILED failing/test.py:failing_test3 - Failure description
+    FAILED failing/test.py:failing_test1 - 失败描述
+    FAILED failing/test.py:failing_test2 - 失败描述
+    FAILED failing/test.py:failing_test3 - 失败描述
     ```
 
     </details>
 
-## Logs Wrangling
+## 日志处理
 
-Download the full log file from Buildkite locally.
+先从 Buildkite 下载完整日志文件到本地。
 
-Strip timestamps and colorization:
+去除时间戳和颜色高亮：
 
 [.buildkite/scripts/ci-clean-log.sh](../../../.buildkite/scripts/ci-clean-log.sh)
 
@@ -70,22 +68,22 @@ Strip timestamps and colorization:
 ./ci-clean-log.sh ci.log
 ```
 
-Use a tool [wl-clipboard](https://github.com/bugaevc/wl-clipboard) for quick copy-pasting:
+可以使用 [wl-clipboard](https://github.com/bugaevc/wl-clipboard) 工具快速复制粘贴：
 
 ```bash
 tail -525 ci_build.log | wl-copy
 ```
 
-## Investigating a CI Test Failure
+## 如何排查 CI 测试失败
 
-1. Go to 👉 [Buildkite main branch](https://buildkite.com/vllm/ci/builds?branch=main)
-2. Bisect to find the first build that shows the issue.  
-3. Add your findings to the GitHub issue.  
-4. If you find a strong candidate PR, mention it in the issue and ping contributors.
+1. 打开 👉 [Buildkite 主分支页面](https://buildkite.com/vllm/ci/builds?branch=main)
+2. 通过二分法查找首次出现该问题的构建。  
+3. 把你的排查结果补充到 GitHub issue 里。  
+4. 如果定位到可能相关的 PR，请在 issue 里提及并 @ 相关贡献者。
 
-## Reproducing a Failure
+## 如何复现失败
 
-CI test failures may be flaky. Use a bash loop to run repeatedly:
+CI 测试失败有时可能是偶发问题（flaky）。可以用 bash 循环多次运行：
 
 [.buildkite/scripts/rerun-test.sh](../../../.buildkite/scripts/rerun-test.sh)
 
@@ -93,26 +91,26 @@ CI test failures may be flaky. Use a bash loop to run repeatedly:
 ./rerun-test.sh tests/v1/engine/test_engine_core_client.py::test_kv_cache_events[True-tcp]
 ```
 
-## Submitting a PR
+## 提交修复 PR
 
-If you submit a PR to fix a CI failure:
+如果你要提交 PR 修复 CI 问题：
 
-- Link the PR to the issue:
-  Add `Closes #12345` to the PR description.
-- Add the `ci-failure` label:
-  This helps track it in the [CI Failures GitHub Project](https://github.com/orgs/vllm-project/projects/20).
+- 请在 PR 描述中关联 issue：
+  添加 `Closes #12345` 到 PR 描述里。
+- 添加 `ci-failure` 标签：
+  这样可以便于在 [CI 失败看板](https://github.com/orgs/vllm-project/projects/20) 跟踪。
 
-## Other Resources
+## 其他资源
 
-- 🔍 [Test Reliability on `main`](https://buildkite.com/organizations/vllm/analytics/suites/ci-1/tests?branch=main&order=ASC&sort_by=reliability)
-- 🧪 [Latest Buildkite CI Runs](https://buildkite.com/vllm/ci/builds?branch=main)
+- 🔍 [主分支测试稳定性](https://buildkite.com/organizations/vllm/analytics/suites/ci-1/tests?branch=main&order=ASC&sort_by=reliability)
+- 🧪 [最新 Buildkite CI 运行](https://buildkite.com/vllm/ci/builds?branch=main)
 
-## Daily Triage
+## 日常分诊
 
-Use [Buildkite analytics (2-day view)](https://buildkite.com/organizations/vllm/analytics/suites/ci-1/tests?branch=main&period=2days) to:
+使用 [Buildkite 分析（近 2 天）](https://buildkite.com/organizations/vllm/analytics/suites/ci-1/tests?branch=main&period=2days) 可以：
 
-- Identify recent test failures **on `main`**.
-- Exclude legitimate test failures on PRs.
-- (Optional) Ignore tests with 0% reliability.
+- 识别主分支（main）上最近的测试失败。
+- 排除 PR 上的有效测试失败。
+- （可选）忽略稳定性为 0% 的测试。
 
-Compare to the [CI Failures Dashboard](https://github.com/orgs/vllm-project/projects/20).
+建议与 [CI 失败看板](https://github.com/orgs/vllm-project/projects/20) 对比查看。

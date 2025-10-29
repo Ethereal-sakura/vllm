@@ -1,6 +1,6 @@
 # CPU
 
-vLLM is a Python library that supports the following CPU variants. Select your CPU type to see vendor specific instructions:
+vLLM 是一个 Python 库，支持以下几种 CPU 类型。请选择你的 CPU 类型，查看对应厂商的安装说明：
 
 === "Intel/AMD x86"
 
@@ -18,9 +18,9 @@ vLLM is a Python library that supports the following CPU variants. Select your C
 
     --8<-- "docs/getting_started/installation/cpu.s390x.inc.md:installation"
 
-## Requirements
+## 环境要求
 
-- Python: 3.10 -- 3.13
+- Python：3.10 到 3.13
 
 === "Intel/AMD x86"
 
@@ -38,17 +38,17 @@ vLLM is a Python library that supports the following CPU variants. Select your C
 
     --8<-- "docs/getting_started/installation/cpu.s390x.inc.md:requirements"
 
-## Set up using Python
+## 使用 Python 环境部署
 
-### Create a new Python environment
+### 创建新的 Python 环境
 
 --8<-- "docs/getting_started/installation/python_env_setup.inc.md"
 
-### Pre-built wheels
+### 预编译的 wheels 包
 
-Currently, there are no pre-built CPU wheels.
+目前尚未提供 CPU 平台的预编译 wheels 包。
 
-### Build wheel from source
+### 从源代码构建 wheel
 
 === "Intel/AMD x86"
 
@@ -66,15 +66,15 @@ Currently, there are no pre-built CPU wheels.
 
     --8<-- "docs/getting_started/installation/cpu.s390x.inc.md:build-wheel-from-source"
 
-## Set up using Docker
+## 使用 Docker 部署
 
-### Pre-built images
+### 预构建镜像
 
 === "Intel/AMD x86"
 
     --8<-- "docs/getting_started/installation/cpu.x86.inc.md:pre-built-images"
 
-### Build image from source
+### 从源码构建镜像
 
 === "Intel/AMD x86"
 
@@ -91,24 +91,24 @@ Currently, there are no pre-built CPU wheels.
 === "IBM Z (S390X)"
     --8<-- "docs/getting_started/installation/cpu.s390x.inc.md:build-image-from-source"
 
-## Related runtime environment variables
+## 相关运行环境变量
 
-- `VLLM_CPU_KVCACHE_SPACE`: specify the KV Cache size (e.g, `VLLM_CPU_KVCACHE_SPACE=40` means 40 GiB space for KV cache), larger setting will allow vLLM running more requests in parallel. This parameter should be set based on the hardware configuration and memory management pattern of users. Default value is `0`.
-- `VLLM_CPU_OMP_THREADS_BIND`: specify the CPU cores dedicated to the OpenMP threads, can be set as CPU id lists or `auto` (by default). For example, `VLLM_CPU_OMP_THREADS_BIND=0-31` means there will be 32 OpenMP threads bound on 0-31 CPU cores. `VLLM_CPU_OMP_THREADS_BIND=0-31|32-63` means there will be 2 tensor parallel processes, 32 OpenMP threads of rank0 are bound on 0-31 CPU cores, and the OpenMP threads of rank1 are bound on 32-63 CPU cores. By setting to `auto`, the OpenMP threads of each rank are bound to the CPU cores in each NUMA node respectively.
-- `VLLM_CPU_NUM_OF_RESERVED_CPU`: specify the number of CPU cores which are not dedicated to the OpenMP threads for each rank. The variable only takes effect when VLLM_CPU_OMP_THREADS_BIND is set to `auto`. Default value is `None`. If the value is not set and use `auto` thread binding, no CPU will be reserved for `world_size == 1`, 1 CPU per rank will be reserved for `world_size > 1`.
-- `CPU_VISIBLE_MEMORY_NODES`: specify visible NUMA memory nodes for vLLM CPU workers, similar to ```CUDA_VISIBLE_DEVICES```. The variable only takes effect when VLLM_CPU_OMP_THREADS_BIND is set to `auto`. The variable provides more control for the auto thread-binding feature, such as masking nodes and changing nodes binding sequence.
-- `VLLM_CPU_MOE_PREPACK` (x86 only): whether to use prepack for MoE layer. This will be passed to `ipex.llm.modules.GatedMLPMOE`. Default is `1` (True). On unsupported CPUs, you might need to set this to `0` (False).
-- `VLLM_CPU_SGL_KERNEL` (x86 only, Experimental): whether to use small-batch optimized kernels for linear layer and MoE layer, especially for low-latency requirements like online serving. The kernels require AMX instruction set, BFloat16 weight type and weight shapes divisible by 32. Default is `0` (False).
+- `VLLM_CPU_KVCACHE_SPACE`：用于设置 KV Cache（键值缓存）的空间大小（比如 `VLLM_CPU_KVCACHE_SPACE=40` 表示分配 40 GiB 的 KV cache 空间），设置越大可以同时处理更多请求。具体值建议根据硬件配置以及内存管理方式调整。默认值为 `0`。
+- `VLLM_CPU_OMP_THREADS_BIND`：指定哪些 CPU 核心专用于 OpenMP 线程，可以设置为 CPU id 列表或 `auto`（默认）。例如，`VLLM_CPU_OMP_THREADS_BIND=0-31` 表示会有 32 个 OpenMP 线程绑定在 0 到 31 号 CPU 核心上。`VLLM_CPU_OMP_THREADS_BIND=0-31|32-63` 表示启动 2 个 tensor 并行进程，rank0 的 32 个 OpenMP 线程绑定在 0-31 号 CPU 核心，rank1 的线程绑定在 32-63 号。若设置为 `auto`，则每个进程的 OpenMP 线程会自动绑定到各自的 NUMA 节点。
+- `VLLM_CPU_NUM_OF_RESERVED_CPU`：为每个进程预留不参与 OpenMP 线程绑定的 CPU 核心数量。仅在 VLLM_CPU_OMP_THREADS_BIND 设置为 `auto` 时生效，默认值为 `None`。如果未设置且使用 `auto`，当 world_size == 1 不预留 CPU，world_size > 1 时每个进程预留 1 个 CPU。
+- `CPU_VISIBLE_MEMORY_NODES`：指定 vLLM CPU worker 可见的 NUMA 内存节点，类似于 ```CUDA_VISIBLE_DEVICES```。该变量仅在 VLLM_CPU_OMP_THREADS_BIND 为 `auto` 时生效，可以用于屏蔽节点或调整绑定顺序，实现更灵活的自动线程绑定。
+- `VLLM_CPU_MOE_PREPACK`（仅 x86）：是否对 MoE 层使用预打包（prepack），会传递给 `ipex.llm.modules.GatedMLPMOE`。默认值为 `1`（开启）。若 CPU 不支持，可能需要设置为 `0`（关闭）。
+- `VLLM_CPU_SGL_KERNEL`（仅 x86，实验性功能）：是否对线性层和 MoE 层采用小批量优化内核，特别适合低延迟场景如在线服务。要求 CPU 支持 AMX 指令集、权重为 BFloat16 且形状为 32 的倍数。默认值为 `0`（关闭）。
 
-## FAQ
+## 常见问题 FAQ
 
-### Which `dtype` should be used?
+### 应该使用哪个 `dtype`？
 
-- Currently vLLM CPU uses model default settings as `dtype`. However, due to unstable float16 support in torch CPU, it is recommended to explicitly set `dtype=bfloat16` if there are any performance or accuracy problem.  
+- 当前 vLLM CPU 默认采用模型自带的 dtype。但由于 torch CPU 的 float16 支持不稳定，若出现性能或精度问题，建议显式设置 `dtype=bfloat16`。
 
-### How to launch a vLLM service on CPU?
+### 如何在 CPU 上启动 vLLM 服务？
 
-- When using the online serving, it is recommended to reserve 1-2 CPU cores for the serving framework to avoid CPU oversubscription. For example, on a platform with 32 physical CPU cores, reserving CPU 31 for the framework and using CPU 0-30 for inference threads:
+- 使用在线服务时，建议为服务框架预留 1-2 个 CPU 核心，避免 CPU 资源过载。比如在拥有 32 个物理核心的平台上，可以预留 31 号 CPU 给服务框架，0-30 号 CPU 用于推理线程：
 
 ```bash
 export VLLM_CPU_KVCACHE_SPACE=40
@@ -116,7 +116,7 @@ export VLLM_CPU_OMP_THREADS_BIND=0-30
 vllm serve facebook/opt-125m --dtype=bfloat16
 ```
 
- or using default auto thread binding:
+或者使用默认的自动线程绑定：
 
 ```bash
 export VLLM_CPU_KVCACHE_SPACE=40
@@ -124,20 +124,20 @@ export VLLM_CPU_NUM_OF_RESERVED_CPU=1
 vllm serve facebook/opt-125m --dtype=bfloat16
 ```
 
-Note, it is recommended to manually reserve 1 CPU for vLLM front-end process when `world_size == 1`.
+注意，当 world_size == 1 时，建议手动为 vLLM 前端进程预留 1 个 CPU。
 
-### How to decide `VLLM_CPU_OMP_THREADS_BIND`?
+### 如何确定 `VLLM_CPU_OMP_THREADS_BIND` 的设置？
 
-- Default `auto` thread-binding is recommended for most cases. Ideally, each OpenMP thread will be bound to a dedicated physical core respectively, threads of each rank will be bound to a same NUMA node respectively, and 1 CPU per rank will be reserved for other vLLM components when `world_size > 1`. If have any performance problems or unexpected binding behaviours, please try to bind threads as following.
+- 大多数情况下推荐使用默认的 `auto` 自动线程绑定。理想情况下，每个 OpenMP 线程绑定到一个独立物理核心，同一个进程的线程绑定到同一个 NUMA 节点，world_size > 1 时每个进程预留 1 个 CPU。若遇到性能问题或绑定异常，可参照以下方式手动绑定线程。
 
-- On a hyper-threading enabled platform with 16 logical CPU cores / 8 physical CPU cores:
+- 在启用超线程的 16 逻辑核 / 8 物理核平台上：
 
-??? console "Commands"
+??? console "命令示例"
 
     ```console
-    $ lscpu -e # check the mapping between logical CPU cores and physical CPU cores
+    $ lscpu -e # 查看逻辑核与物理核的对应关系
 
-    # The "CPU" column means the logical CPU core IDs, and the "CORE" column means the physical core IDs. On this platform, two logical cores are sharing one physical core.
+    # "CPU" 列为逻辑核编号，"CORE" 列为物理核编号。此平台每两个逻辑核共享一个物理核。
     CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE    MAXMHZ   MINMHZ      MHZ
     0    0      0    0 0:0:0:0          yes 2401.0000 800.0000  800.000
     1    0      0    1 1:1:1:0          yes 2401.0000 800.0000  800.000
@@ -156,67 +156,67 @@ Note, it is recommended to manually reserve 1 CPU for vLLM front-end process whe
     14   0      0    6 6:6:6:0          yes 2401.0000 800.0000  800.000
     15   0      0    7 7:7:7:0          yes 2401.0000 800.0000  800.000
 
-    # On this platform, it is recommend to only bind openMP threads on logical CPU cores 0-7 or 8-15
+    # 在该平台上，建议只绑定 OpenMP 线程到 0-7 或 8-15 号逻辑核
     $ export VLLM_CPU_OMP_THREADS_BIND=0-7
     $ python examples/offline_inference/basic/basic.py
     ```
 
-- When deploy vLLM CPU backend on a multi-socket machine with NUMA and enable tensor parallel or pipeline parallel, each NUMA node is treated as a TP/PP rank. So be aware to set CPU cores of a single rank on a same NUMA node to avoid cross NUMA node memory access.
+- 当在多路服务器（多 socket、NUMA）上部署 vLLM CPU 后端，并启用 tensor 并行或 pipeline 并行时，每个 NUMA 节点会作为一个 TP/PP 进程。请确保同一个进程的 CPU 核心都在同一个 NUMA 节点，避免跨 NUMA 节点的内存访问。
 
-### How to decide `VLLM_CPU_KVCACHE_SPACE`?
+### 如何设置 `VLLM_CPU_KVCACHE_SPACE`？
 
-This value is 4GB by default. Larger space can support more concurrent requests, longer context length. However, users should take care of memory capacity of each NUMA node. The memory usage of each TP rank is the sum of `weight shard size` and `VLLM_CPU_KVCACHE_SPACE`, if it exceeds the capacity of a single NUMA node, the TP worker will be killed with `exitcode 9` due to out-of-memory.
+该参数默认值为 4GB。更大的 KV cache 空间可以支持更多并发请求和更长的上下文，但需要注意每个 NUMA 节点的内存容量。每个 TP 进程的内存占用为 `weight shard size` 与 `VLLM_CPU_KVCACHE_SPACE` 之和，若超过单个 NUMA 节点的容量，TP worker 会因内存不足被 kill（exitcode 9）。
 
-### How to do performance tuning for vLLM CPU?
+### 如何对 vLLM CPU 进行性能调优？
 
-First of all, please make sure the thread-binding and KV cache space are properly set and take effect. You can check the thread-binding by running a vLLM benchmark and observing CPU cores usage via `htop`.
+首先，请确保线程绑定和 KV cache 空间已正确设置并生效。可以通过运行 vLLM 基准测试并用 `htop` 观察 CPU 核心使用情况确认。
 
-Inference batch size is an important parameter for the performance. Larger batch usually provides higher throughput, smaller batch provides lower latency. Tuning max batch size starts from default value to balance throughput and latency is an effective way to improve vLLM CPU performance on specific platforms. There are two important related parameters in vLLM:
+推理批大小（batch size）对性能影响很大。批越大吞吐量越高，批越小延迟越低。建议从默认值开始调整最大批大小，在吞吐和延迟之间找到平衡点，以提升 vLLM CPU 在特定平台上的性能。vLLM 有两个重要相关参数：
 
-- `--max-num-batched-tokens`, defines the limit of token numbers in a single batch, has more impacts on the first token performance. The default value is set as:
-    - Offline Inference: `4096 * world_size`
-    - Online Serving: `2048 * world_size`
-- `--max-num-seqs`, defines the limit of sequence numbers in a single batch, has more impacts on the output token performance.
-    - Offline Inference: `256 * world_size`
-    - Online Serving: `128 * world_size`
+- `--max-num-batched-tokens`：限制单批次的 token 数量，对首 token 性能影响较大。默认值如下：
+    - 离线推理：`4096 * world_size`
+    - 在线服务：`2048 * world_size`
+- `--max-num-seqs`：限制单批次序列数量，对输出 token 性能影响较大。
+    - 离线推理：`256 * world_size`
+    - 在线服务：`128 * world_size`
 
-vLLM CPU supports data parallel (DP), tensor parallel (TP) and pipeline parallel (PP) to leverage multiple CPU sockets and memory nodes. For more details of tuning DP, TP and PP, please refer to [Optimization and Tuning](../../configuration/optimization.md). For vLLM CPU, it is recommended to use DP, TP and PP together if there are enough CPU sockets and memory nodes.
+vLLM CPU 支持数据并行（DP）、张量并行（TP）和流水线并行（PP），可充分利用多 socket 和多内存节点。更多 DP、TP、PP 的调优细节请参见[优化与调优](../../configuration/optimization.md)。如有充足的 CPU socket 和内存节点，建议同时使用 DP、TP 和 PP。
 
-### Which quantization configs does vLLM CPU support?
+### vLLM CPU 支持哪些量化配置？
 
-- vLLM CPU supports quantizations:
-    - AWQ (x86 only)
-    - GPTQ (x86 only)
-    - compressed-tensor INT8 W8A8 (x86, s390x)
+- vLLM CPU 支持如下量化方式：
+    - AWQ（仅 x86）
+    - GPTQ（仅 x86）
+    - compressed-tensor INT8 W8A8（x86、s390x）
 
-### (x86 only) What is the purpose of `VLLM_CPU_MOE_PREPACK` and `VLLM_CPU_SGL_KERNEL`?
+### （仅 x86）`VLLM_CPU_MOE_PREPACK` 和 `VLLM_CPU_SGL_KERNEL` 有什么作用？
 
-- Both of them require `amx` CPU flag.
-    - `VLLM_CPU_MOE_PREPACK` can provides better performance for MoE models
-    - `VLLM_CPU_SGL_KERNEL` can provides better performance for MoE models and small-batch scenarios.
+- 两者都需要 CPU 支持 `amx` 指令集。
+    - `VLLM_CPU_MOE_PREPACK` 可提升 MoE 模型性能
+    - `VLLM_CPU_SGL_KERNEL` 对 MoE 模型和小批量场景有更好的性能表现
 
-### Why do I see `get_mempolicy: Operation not permitted` when running in Docker?
+### 为什么在 Docker 里运行时看到 `get_mempolicy: Operation not permitted`？
 
-In some container environments (like Docker), NUMA-related syscalls used by vLLM (e.g., `get_mempolicy`, `migrate_pages`) are blocked/denied in the runtime's default seccomp/capabilities settings. This may lead to warnings like `get_mempolicy: Operation not permitted`. Functionality is not affected, but NUMA memory binding/migration optimizations may not take effect and performance can be suboptimal.
+在部分容器环境（如 Docker）中，vLLM 用到的 NUMA 相关系统调用（如 `get_mempolicy`、`migrate_pages`）默认会被 seccomp/capabilities 限制，导致出现 `get_mempolicy: Operation not permitted` 的警告。功能不会受影响，但 NUMA 内存绑定和迁移优化无法生效，性能可能不理想。
 
-To enable these optimizations inside Docker with the least privilege, you can follow below tips:
+要在 Docker 里开启这些优化，并尽量减少权限提升，可以参考以下设置：
 
 ```bash
 docker run ... --cap-add SYS_NICE --security-opt seccomp=unconfined  ...
 
-# 1) `--cap-add SYS_NICE` is to address `get_mempolicy` EPERM issue.
+# 1) `--cap-add SYS_NICE` 用于解决 `get_mempolicy` 权限问题
 
-# 2) `--security-opt seccomp=unconfined` is to enable `migrate_pages` for `numa_migrate_pages()`.
-# Actually, `seccomp=unconfined` bypasses the seccomp for container,
-# if it's unacceptable, you can customize your own seccomp profile,
-# based on docker/runtime default.json and add `migrate_pages` to `SCMP_ACT_ALLOW` list.
+# 2) `--security-opt seccomp=unconfined` 用于支持 `migrate_pages`，使 `numa_migrate_pages()` 正常工作。
+# 实际上，`seccomp=unconfined` 会跳过容器 seccomp 限制，
+# 如果不能接受，可以自定义 seccomp 配置文件，
+# 基于 docker/runtime 默认的 default.json，将 `migrate_pages` 加入 `SCMP_ACT_ALLOW` 列表。
 
-# reference : https://docs.docker.com/engine/security/seccomp/
+# 参考文档： https://docs.docker.com/engine/security/seccomp/
 ```
 
-Alternatively, running with `--privileged=true` also works but is broader and not generally recommended.
+另外，也可以使用 `--privileged=true` 运行容器，但该方式权限提升较多，一般不推荐。
 
-In K8S, the following configuration can be added to workload yaml to achieve the same effect as above:
+如果在 K8S 环境部署，可以在 workload 的 yaml 配置中添加以下内容，达到同样效果：
 
 ```yaml
 securityContext:

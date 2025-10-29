@@ -1,31 +1,31 @@
-# Registering a Model
+# 注册模型
 
-vLLM relies on a model registry to determine how to run each model.
-A list of pre-registered architectures can be found [here](../../models/supported_models.md).
+vLLM 依赖模型注册表（model registry）来决定如何运行每个模型。
+你可以在[这里](../../models/supported_models.md)查看已预注册的模型架构列表。
 
-If your model is not on this list, you must register it to vLLM.
-This page provides detailed instructions on how to do so.
+如果你的模型不在这个列表中，你需要将其注册到 vLLM。
+本页面将为你详细介绍注册流程。
 
-## Built-in models
+## 内置模型
 
-To add a model directly to the vLLM library, start by forking our [GitHub repository](https://github.com/vllm-project/vllm) and then [build it from source](../../getting_started/installation/gpu.md#build-wheel-from-source).
-This gives you the ability to modify the codebase and test your model.
+如果你想直接将模型加入 vLLM 库，首先需要 fork 我们的 [GitHub 仓库](https://github.com/vllm-project/vllm)，然后按照[从源码构建](../../getting_started/installation/gpu.md#build-wheel-from-source)的说明进行安装。
+这样你就可以自由修改代码库并测试你的模型。
 
-After you have implemented your model (see [tutorial](basic.md)), put it into the [vllm/model_executor/models](../../../vllm/model_executor/models) directory.
-Then, add your model class to `_VLLM_MODELS` in [vllm/model_executor/models/registry.py](../../../vllm/model_executor/models/registry.py) so that it is automatically registered upon importing vLLM.
-Finally, update our [list of supported models](../../models/supported_models.md) to promote your model!
+在完成模型实现后（参考[教程](basic.md)），请将模型文件放到 [vllm/model_executor/models](../../../vllm/model_executor/models) 目录下。
+接着，在 [vllm/model_executor/models/registry.py](../../../vllm/model_executor/models/registry.py) 文件中的 `_VLLM_MODELS` 列表里添加你的模型类，这样在导入 vLLM 时模型会自动注册。
+最后，别忘了更新我们的[支持模型列表](../../models/supported_models.md)，让更多人了解你的模型！
 
 !!! important
-    The list of models in each section should be maintained in alphabetical order.
+    每个部分中的模型列表都应按照字母顺序维护。
 
-## Out-of-tree models
+## 外部模型
 
-You can load an external model [using a plugin](../../design/plugin_system.md) without modifying the vLLM codebase.
+你可以通过[插件机制](../../design/plugin_system.md)加载外部模型，无需更改 vLLM 代码库。
 
-To register the model, use the following code:
+要注册模型，可以使用如下代码：
 
 ```python
-# The entrypoint of your plugin
+# 你的插件入口文件
 def register():
     from vllm import ModelRegistry
     from your_code import YourModelForCausalLM
@@ -33,10 +33,10 @@ def register():
     ModelRegistry.register_model("YourModelForCausalLM", YourModelForCausalLM)
 ```
 
-If your model imports modules that initialize CUDA, consider lazy-importing it to avoid errors like `RuntimeError: Cannot re-initialize CUDA in forked subprocess`:
+如果你的模型在导入时会初始化 CUDA，建议使用延迟导入（lazy-import），以避免出现 `RuntimeError: Cannot re-initialize CUDA in forked subprocess` 这样的错误：
 
 ```python
-# The entrypoint of your plugin
+# 你的插件入口文件
 def register():
     from vllm import ModelRegistry
 
@@ -47,5 +47,5 @@ def register():
 ```
 
 !!! important
-    If your model is a multimodal model, ensure the model class implements the [SupportsMultiModal][vllm.model_executor.models.interfaces.SupportsMultiModal] interface.
-    Read more about that [here](multimodal.md).
+    如果你的模型属于多模态模型，请确保模型类实现了 [SupportsMultiModal][vllm.model_executor.models.interfaces.SupportsMultiModal] 接口。
+    详细介绍请查看[这里](multimodal.md)

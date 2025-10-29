@@ -1,18 +1,18 @@
 # --8<-- [start:installation]
 
-vLLM has been adapted to work on ARM64 CPUs with NEON support, leveraging the CPU backend initially developed for the x86 platform.
+vLLM 已适配运行在支持 NEON 的 ARM64 架构 CPU 上，底层利用了最初为 x86 平台开发的 CPU 后端。
 
-ARM CPU backend currently supports Float32, FP16 and BFloat16 datatypes.
+目前，ARM CPU 后端支持 Float32、FP16 和 BFloat16 三种数据类型。
 
 !!! warning
-    There are no pre-built wheels or images for this device, so you must build vLLM from source.
+    目前没有为该设备提供预编译的 wheel 或镜像包，因此你需要从源码自行构建 vLLM。
 
 # --8<-- [end:installation]
 # --8<-- [start:requirements]
 
-- OS: Linux
-- Compiler: `gcc/g++ >= 12.3.0` (optional, recommended)
-- Instruction Set Architecture (ISA): NEON support is required
+- 操作系统：Linux
+- 编译器：`gcc/g++ >= 12.3.0`（可选，但推荐使用）
+- 指令集架构（ISA）：需要支持 NEON
 
 # --8<-- [end:requirements]
 # --8<-- [start:set-up-using-python]
@@ -23,7 +23,7 @@ ARM CPU backend currently supports Float32, FP16 and BFloat16 datatypes.
 # --8<-- [end:pre-built-wheels]
 # --8<-- [start:build-wheel-from-source]
 
-First, install the recommended compiler. We recommend using `gcc/g++ >= 12.3.0` as the default compiler to avoid potential problems. For example, on Ubuntu 22.4, you can run:
+首先，安装推荐的编译器。我们建议将 `gcc/g++ >= 12.3.0` 设置为默认编译器，以避免潜在的问题。例如，在 Ubuntu 22.4 上可以执行：
 
 ```bash
 sudo apt-get update  -y
@@ -31,14 +31,14 @@ sudo apt-get install -y --no-install-recommends ccache git curl wget ca-certific
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 10 --slave /usr/bin/g++ g++ /usr/bin/g++-12
 ```
 
-Second, clone the vLLM project:
+然后，克隆 vLLM 项目源码：
 
 ```bash
 git clone https://github.com/vllm-project/vllm.git vllm_source
 cd vllm_source
 ```
 
-Third, install required dependencies:
+接下来，安装所需依赖项：
 
 ```bash
 uv pip install -r requirements/cpu-build.txt --torch-backend cpu
@@ -52,19 +52,19 @@ uv pip install -r requirements/cpu.txt --torch-backend cpu
     pip install -v -r requirements/cpu.txt --extra-index-url https://download.pytorch.org/whl/cpu
     ```
 
-Finally, build and install vLLM:
+最后，构建并安装 vLLM：
 
 ```bash
 VLLM_TARGET_DEVICE=cpu uv pip install . --no-build-isolation
 ```
 
-If you want to develop vLLM, install it in editable mode instead.
+如果你希望进行二次开发，可以使用可编辑模式安装：
 
 ```bash
 VLLM_TARGET_DEVICE=cpu uv pip install -e . --no-build-isolation
 ```
 
-Testing has been conducted on AWS Graviton3 instances for compatibility.
+在 AWS Graviton3 实例上已进行兼容性测试。
 
 # --8<-- [end:build-wheel-from-source]
 # --8<-- [start:pre-built-images]
@@ -75,7 +75,7 @@ Testing has been conducted on AWS Graviton3 instances for compatibility.
 docker build -f docker/Dockerfile.cpu \
         --tag vllm-cpu-env .
 
-# Launching OpenAI server
+# 启动 OpenAI 服务器
 docker run --rm \
             --privileged=true \
             --shm-size=4g \
@@ -89,7 +89,7 @@ docker run --rm \
 ```
 
 !!! tip
-    An alternative of `--privileged=true` is `--cap-add SYS_NICE --security-opt seccomp=unconfined`.
+    你也可以使用 `--cap-add SYS_NICE --security-opt seccomp=unconfined` 作为 `--privileged=true` 的替代方案。
 
 # --8<-- [end:build-image-from-source]
 # --8<-- [start:extra-information]

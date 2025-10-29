@@ -1,34 +1,34 @@
 # BitBLAS
 
-vLLM now supports [BitBLAS](https://github.com/microsoft/BitBLAS) for more efficient and flexible model inference. Compared to other quantization frameworks, BitBLAS provides more precision combinations.
+vLLM 现在支持 [BitBLAS](https://github.com/microsoft/BitBLAS)，可以实现更高效、更灵活的模型推理。与其他量化框架相比，BitBLAS 提供了更多的精度组合选择。
 
 !!! note
-    Ensure your hardware supports the selected `dtype` (`torch.bfloat16` or `torch.float16`).
-    Most recent NVIDIA GPUs support `float16`, while `bfloat16` is more common on newer architectures like Ampere or Hopper.
-    For details see [supported hardware](README.md#supported-hardware).
+    请确保你的硬件支持所选的 `dtype`（`torch.bfloat16` 或 `torch.float16`）。
+    目前大多数新款 NVIDIA GPU 支持 `float16`，而 `bfloat16` 主要在 Ampere 或 Hopper 等新架构上更常见。
+    更多信息请参考 [支持的硬件](README.md#supported-hardware)
 
-Below are the steps to utilize BitBLAS with vLLM.
+下面是如何在 vLLM 中使用 BitBLAS 的步骤。
 
 ```bash
 pip install bitblas>=0.1.0
 ```
 
-vLLM reads the model's config file and supports pre-quantized checkpoints.
+vLLM 会读取模型的配置文件，并支持已经预量化的 checkpoint。
 
-You can find pre-quantized models on:
+你可以在以下位置找到预量化的模型：
 
 - [Hugging Face (BitBLAS)](https://huggingface.co/models?search=bitblas)
 - [Hugging Face (GPTQ)](https://huggingface.co/models?search=gptq)
 
-Usually, these repositories have a `quantize_config.json` file that includes a `quantization_config` section.
+通常，这些模型仓库中会有一个 `quantize_config.json` 文件，其中包含了 `quantization_config` 配置。
 
-## Read bitblas format checkpoint
+## 读取 bitblas 格式的 checkpoint
 
 ```python
 from vllm import LLM
 import torch
 
-# "hxbgsyxh/llama-13b-4bit-g-1-bitblas" is a pre-quantized checkpoint.
+# "hxbgsyxh/llama-13b-4bit-g-1-bitblas" 是一个已预量化的 checkpoint。
 model_id = "hxbgsyxh/llama-13b-4bit-g-1-bitblas"
 llm = LLM(
     model=model_id,
@@ -38,7 +38,7 @@ llm = LLM(
 )
 ```
 
-## Read gptq format checkpoint
+## 读取 gptq 格式的 checkpoint
 
 ??? code
 
@@ -46,7 +46,7 @@ llm = LLM(
     from vllm import LLM
     import torch
 
-    # "hxbgsyxh/llama-13b-4bit-g-1" is a pre-quantized checkpoint.
+    # "hxbgsyxh/llama-13b-4bit-g-1" 是一个已预量化的 checkpoint。
     model_id = "hxbgsyxh/llama-13b-4bit-g-1"
     llm = LLM(
         model=model_id,

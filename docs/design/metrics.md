@@ -1,83 +1,83 @@
-# Metrics
+# 指标（Metrics）
 
-vLLM exposes a rich set of metrics to support observability and capacity planning for the V1 engine.
+vLLM 提供了丰富的指标体系，支持 V1 引擎的可观测性和容量规划。
 
-## Objectives
+## 目标
 
-- Provide comprehensive coverage of engine and request level metrics to aid production monitoring.
-- Prioritize Prometheus integrations, as this is what we expect to be used in production environments.
-- Offer logging support (i.e. printing metrics to the info log) for ad-hoc testing, debugging, development, and exploratory use cases.
+- 覆盖引擎级和请求级的指标，便于生产环境监控。
+- 优先集成 Prometheus，因为我们预期生产环境主要会用它。
+- 支持日志输出（比如将指标打印到 info 日志），方便临时测试、调试、开发和探索性使用场景。
 
-## Background
+## 背景
 
-Metrics in vLLM can be categorized as follows:
+vLLM 中的指标主要分为以下几类：
 
-1. Server-level metrics: Global metrics that track the state and performance of the LLM engine. These are typically exposed as Gauges or Counters in Prometheus.
-2. Request-level metrics: Metrics that track the characteristics (e.g. size and timing) of individual requests. These are typically exposed as Histograms in Prometheus and are often the SLOs that an SRE monitoring vLLM will be tracking.
+1. 服务器级指标：用于跟踪 LLM 引擎全局状态和性能，通常通过 Prometheus 以 Gauge（仪表盘）或 Counter（计数器）形式暴露。
+2. 请求级指标：用于跟踪单个请求的特征（如请求大小和处理时长），通常以 Histogram（直方图）形式暴露，也是 SRE 监控 vLLM 时关注的服务水平目标（SLO）。
 
-The mental model is that server-level metrics help explain the values of request-level metrics.
+简而言之，服务器级指标用于解释请求级指标的变化原因。
 
-### Metrics Overview
+### 指标总览
 
-### v1 Metrics
+### v1 指标
 
-In v1, the following metrics are exposed via a Prometheus-compatible `/metrics` endpoint using the `vllm:` prefix:
+在 v1 版本中，以下指标通过 Prometheus 兼容的 `/metrics` 端点暴露，统一使用 `vllm:` 前缀：
 
-- `vllm:num_requests_running` (Gauge) - Number of requests currently running.
-- `vllm:num_requests_waiting` (Gauge) - Number of requests currently waiting.
-- `vllm:kv_cache_usage_perc` (Gauge) - Fraction of used KV cache blocks (0–1).
-- `vllm:prefix_cache_queries` (Counter) - Number of prefix cache queries.
-- `vllm:prefix_cache_hits` (Counter) - Number of prefix cache hits.
-- `vllm:mm_cache_queries` (Counter) - (For multimodal models) Number of multimodal cache queries.
-- `vllm:mm_cache_hits` (Counter) - (For multimodal models) Number of multimodal cache hits.
-- `vllm:num_preemptions_total` (Counter) - Number of preemptions.
-- `vllm:prompt_tokens_total` (Counter) - Total number of prompt tokens processed.
-- `vllm:generation_tokens_total` (Counter) - Total number of generated tokens.
-- `vllm:iteration_tokens_total` (Histogram) - Histogram of tokens processed in each engine step.
-- `vllm:cache_config_info` (Gauge) - Information about the cache configuration.
-- `vllm:request_success_total` (Counter) - Number of finished requests (by finish reason).
-- `vllm:request_prompt_tokens` (Histogram) - Histogram of input prompt token counts.
-- `vllm:request_generation_tokens` (Histogram) - Histogram of generation token counts.
-- `vllm:request_params_n` (Histogram) - Histogram of request parameter n.
-- `vllm:request_params_max_tokens` - (Histogram) - Histogram of max_tokens parameter in requests.
-- `vllm:time_to_first_token_seconds` (Histogram) - Time to first token (TTFT).
-- `vllm:inter_token_latency_seconds` (Histogram) - Inter-token latency.
-- `vllm:e2e_request_latency_seconds` (Histogram) - End-to-end request latency.
-- `vllm:request_queue_time_seconds` (Histogram) - Time spent in the queue.
-- `vllm:request_inference_time_seconds` (Histogram) - Request inference time.
-- `vllm:request_prefill_time_seconds` (Histogram) - Request prefill time.
-- `vllm:request_decode_time_seconds` (Histogram) - Request decode time.
+- `vllm:num_requests_running` (Gauge) - 当前正在运行的请求数
+- `vllm:num_requests_waiting` (Gauge) - 当前等待中的请求数
+- `vllm:kv_cache_usage_perc` (Gauge) - KV 缓存块的使用比例（0–1）
+- `vllm:prefix_cache_queries` (Counter) - 前缀缓存查询次数
+- `vllm:prefix_cache_hits` (Counter) - 前缀缓存命中次数
+- `vllm:mm_cache_queries` (Counter) - （多模态模型）多模态缓存查询次数
+- `vllm:mm_cache_hits` (Counter) - （多模态模型）多模态缓存命中次数
+- `vllm:num_preemptions_total` (Counter) - 抢占次数
+- `vllm:prompt_tokens_total` (Counter) - 处理过的提示词 token 总数
+- `vllm:generation_tokens_total` (Counter) - 生成的 token 总数
+- `vllm:iteration_tokens_total` (Histogram) - 每次引擎迭代处理的 token 数量分布
+- `vllm:cache_config_info` (Gauge) - 缓存配置信息
+- `vllm:request_success_total` (Counter) - 已完成请求的数量（按完成原因分类）
+- `vllm:request_prompt_tokens` (Histogram) - 输入提示词 token 数量分布
+- `vllm:request_generation_tokens` (Histogram) - 生成 token 数量分布
+- `vllm:request_params_n` (Histogram) - 请求参数 n 的分布
+- `vllm:request_params_max_tokens` (Histogram) - 请求参数 max_tokens 的分布
+- `vllm:time_to_first_token_seconds` (Histogram) - 首 token 时间（TTFT）
+- `vllm:inter_token_latency_seconds` (Histogram) - token 间延迟
+- `vllm:e2e_request_latency_seconds` (Histogram) - 请求端到端延迟
+- `vllm:request_queue_time_seconds` (Histogram) - 排队等待时长
+- `vllm:request_inference_time_seconds` (Histogram) - 推理时长
+- `vllm:request_prefill_time_seconds` (Histogram) - 预填充时长
+- `vllm:request_decode_time_seconds` (Histogram) - 解码时长
 
-These are documented under [Inferencing and Serving -> Production Metrics](../usage/metrics.md).
+详细文档参见 [推理与服务 -> 生产环境指标](../usage/metrics.md)。
 
-### Grafana Dashboard
+### Grafana 仪表盘
 
-vLLM also provides [a reference example](../../examples/online_serving/prometheus_grafana/README.md) for how to collect and store these metrics using Prometheus and visualize them using a Grafana dashboard.
+vLLM 还提供了[参考示例](../../examples/online_serving/prometheus_grafana/README.md)，展示如何借助 Prometheus 收集、存储这些指标，并用 Grafana 仪表盘进行可视化。
 
-The subset of metrics exposed in the Grafana dashboard gives us an indication of which metrics are especially important:
+Grafana 仪表盘暴露的指标子集，体现了哪些指标尤其关键：
 
-- `vllm:e2e_request_latency_seconds_bucket` - End to end request latency measured in seconds.
-- `vllm:prompt_tokens_total` - Prompt tokens.
-- `vllm:generation_tokens_total` - Generation tokens.
-- `vllm:time_per_output_token_seconds` - Inter-token latency (Time Per Output Token, TPOT) in seconds.
-- `vllm:time_to_first_token_seconds` - Time to First Token (TTFT) latency in seconds.
-- `vllm:num_requests_running` (also, `_swapped` and `_waiting`) - Number of requests in the RUNNING, WAITING, and SWAPPED states.
-- `vllm:gpu_cache_usage_perc` - Percentage of used cache blocks by vLLM.
-- `vllm:request_prompt_tokens` - Request prompt length.
-- `vllm:request_generation_tokens` - Request generation length.
-- `vllm:request_success_total` - Number of finished requests by their finish reason: either an EOS token was generated or the max sequence length was reached.
-- `vllm:request_queue_time_seconds` - Queue time.
-- `vllm:request_prefill_time_seconds` - Requests prefill time.
-- `vllm:request_decode_time_seconds` - Requests decode time.
-- `vllm:request_max_num_generation_tokens` - Max generation tokens in a sequence group.
+- `vllm:e2e_request_latency_seconds_bucket` - 端到端请求延迟（单位：秒）
+- `vllm:prompt_tokens_total` - 提示词 token 总数
+- `vllm:generation_tokens_total` - 生成 token 总数
+- `vllm:time_per_output_token_seconds` - token 间延迟（TPOT，单位：秒）
+- `vllm:time_to_first_token_seconds` - 首 token 时间（TTFT，单位：秒）
+- `vllm:num_requests_running`（以及 `_swapped` 和 `_waiting`）- 各状态（RUNNING、WAITING、SWAPPED）下的请求数
+- `vllm:gpu_cache_usage_perc` - GPU 缓存块使用率
+- `vllm:request_prompt_tokens` - 请求提示词长度
+- `vllm:request_generation_tokens` - 请求生成长度
+- `vllm:request_success_total` - 按完成原因统计的请求数（如生成 EOS token 或达到最大序列长度）
+- `vllm:request_queue_time_seconds` - 排队时间
+- `vllm:request_prefill_time_seconds` - 预填充时长
+- `vllm:request_decode_time_seconds` - 解码时长
+- `vllm:request_max_num_generation_tokens` - 每个序列组的最大生成 token 数
 
-See [the PR which added this Dashboard](https://github.com/vllm-project/vllm/pull/2316) for interesting and useful background on the choices made here.
+更多背景和选择原则，参见 [新增仪表盘的 PR](https://github.com/vllm-project/vllm/pull/2316)。
 
-### Prometheus Client Library
+### Prometheus 客户端库
 
-Prometheus support was initially added [using the aioprometheus library](https://github.com/vllm-project/vllm/pull/1890), but a switch was made quickly to [prometheus_client](https://github.com/vllm-project/vllm/pull/2730). The rationale is discussed in both linked PRs.
+最初我们[采用 aioprometheus 库集成 Prometheus](https://github.com/vllm-project/vllm/pull/1890)，但很快切换到了 [prometheus_client](https://github.com/vllm-project/vllm/pull/2730)。详细原因可见相关 PR。
 
-During those migrations we briefly lost a `MetricsMiddleware` to track HTTP metrics, but this was reinstated [using prometheus_fastapi_instrumentator](https://github.com/vllm-project/vllm/pull/15657):
+迁移过程中，一度丢失了用于追踪 HTTP 指标的 `MetricsMiddleware`，但后来通过 [prometheus_fastapi_instrumentator](https://github.com/vllm-project/vllm/pull/15657) 恢复：
 
 ```bash
 $ curl http://0.0.0.0:8000/metrics 2>/dev/null  | grep -P '^http_(?!.*(_bucket|_created|_sum)).*'
@@ -88,15 +88,15 @@ http_request_duration_highr_seconds_count 201.0
 http_request_duration_seconds_count{handler="/v1/completions",method="POST"} 201.0
 ```
 
-### Multi-process Mode
+### 多进程模式
 
-Historically, metrics were collected in the engine core process and multiprocess mode was used to make them available in the API server process. See <https://github.com/vllm-project/vllm/pull/7279>.
+历史上，指标收集是在引擎核心进程完成，通过多进程模式让 API 服务器进程能获取这些数据。参考 <https://github.com/vllm-project/vllm/pull/7279>
 
-More recently, metrics are collected in the API server process and multiprocess mode is only used when `--api-server-count > 1`. See <https://github.com/vllm-project/vllm/pull/17546> and details on [API server scale-out](../serving/data_parallel_deployment.md#internal-load-balancing).
+近期，指标改为在 API 服务器进程收集，只有当 `--api-server-count > 1` 时才使用多进程。详情可见 <https://github.com/vllm-project/vllm/pull/17546> 及 [API 服务器扩展部署说明](../serving/data_parallel_deployment.md#internal-load-balancing)。
 
-### Built in Python/Process Metrics
+### Python/进程内置指标
 
-The following metrics are supported by default by `prometheus_client`, but they are not exposed when multiprocess mode is used:
+`prometheus_client` 默认支持以下指标，但在启用多进程模式时不会暴露：
 
 - `python_gc_objects_collected_total`
 - `python_gc_objects_uncollectable_total`
@@ -109,15 +109,15 @@ The following metrics are supported by default by `prometheus_client`, but they 
 - `process_open_fds`
 - `process_max_fds`
 
-Therefore, these metrics are unavailable when `--api-server-count > 1`. It's questionable how relevant these are since they do not aggregate these stats for all processes that make up a vLLM instance.
+因此，当 `--api-server-count > 1` 时，这些指标不可用。其实这些指标也不一定很有意义，因为不能汇总 vLLM 实例的所有进程信息。
 
-## Metrics Design
+## 指标设计
 
-The ["Even Better Observability"](https://github.com/vllm-project/vllm/issues/3616) feature where was where much of the metrics design was planned. For example, see where [a detailed roadmap was laid out](https://github.com/vllm-project/vllm/issues/3616#issuecomment-2030858781).
+关于指标设计，很多讨论和规划见于 ["更好的可观测性" 议题](https://github.com/vllm-project/vllm/issues/3616)。例如，[详细的规划路线图](https://github.com/vllm-project/vllm/issues/3616#issuecomment-2030858781)。
 
-### Legacy PRs
+### 历史 PR
 
-To help understand the background to the metrics design, here are some of the relevant PRs which added the original, now legacy, metrics:
+想了解指标设计的由来，可以查看以下相关 PR（添加了原始/已废弃指标）：
 
 - <https://github.com/vllm-project/vllm/pull/1890>
 - <https://github.com/vllm-project/vllm/pull/2316>
@@ -125,9 +125,9 @@ To help understand the background to the metrics design, here are some of the re
 - <https://github.com/vllm-project/vllm/pull/4464>
 - <https://github.com/vllm-project/vllm/pull/7279>
 
-### Metrics Implementation PRs
+### 指标实现相关 PR
 
-For background, here are the relevant PRs relating to the metrics implementation <https://github.com/vllm-project/vllm/issues/10582>:
+更多实现细节，参考以下 PR 和议题 <https://github.com/vllm-project/vllm/issues/10582>：
 
 - <https://github.com/vllm-project/vllm/pull/11962>
 - <https://github.com/vllm-project/vllm/pull/11973>
@@ -141,168 +141,103 @@ For background, here are the relevant PRs relating to the metrics implementation
 - <https://github.com/vllm-project/vllm/pull/12592>
 - <https://github.com/vllm-project/vllm/pull/12644>
 
-### Metrics Collection
+### 指标收集
 
-In v1, we wish to move computation and overhead out of the engine core
-process to minimize the time between each forward pass.
+在 v1 设计中，我们希望将计算与开销移出引擎核心进程，从而减少每次前向推理之间的延迟。
 
-The overall idea of V1 EngineCore design is:
+V1 EngineCore 的设计理念：
 
-- EngineCore is the inner loop. Performance is most critical here
-- AsyncLLM is the outer loop. This is overlapped with GPU execution
-  (ideally), so this is where any "overheads" should be if
-  possible. So AsyncLLM.output_handler_loop is the ideal place for the
-  metrics bookkeeping if possible.
+- EngineCore 是核心循环，对性能要求最高
+- AsyncLLM 是外层循环，能与 GPU 执行并行（理想情况下），因此各类“开销”应尽量放在这里。`AsyncLLM.output_handler_loop` 是指标统计的理想位置。
 
-We will achieve this by collecting metrics in the frontend API server,
-and base these metrics on information we can glean from the
-`EngineCoreOutputs` returned by the engine core process to the
-frontend.
+实现方式是：在前端 API 服务器收集指标，基于引擎核心进程返回的 `EngineCoreOutputs` 信息进行统计。
 
-### Interval Calculations
+### 时长间隔计算
 
-Many of our metrics are the time interval between various events in
-the processing of a request. It is best practice to use timestamps
-based on "monotonic time" (`time.monotonic()`) rather than "wall-clock
-time" (`time.time()`) to calculate intervals as the former is
-unaffected by system clock changes (e.g. from NTP).
+许多指标关注的是请求处理过程中各事件的时间间隔。最佳实践是用“单调时间”（`time.monotonic()`）而不是“系统时间”（`time.time()`）计算间隔，因为单调时间不受系统时钟变化影响（比如 NTP 校准）。
 
-It's also important to note that monotonic clocks differ between
-processes - each process has its own reference point. So it is
-meaningless to compare monotonic timestamps from different processes.
+但要注意，单调时钟是进程私有的——不同进程的单调时间基准点不一样。所以不能比较不同进程的单调时间戳。
 
-Therefore, in order to calculate an interval, we must compare two
-monotonic timestamps from the same process.
+因此，计算间隔时必须比较来自同一进程的两个单调时间戳。
 
-### Scheduler Stats
+### 调度器统计信息
 
-The engine core process will collect some key statistics from the
-scheduler - e.g. the number of requests that were scheduled or waiting
-after the last scheduler pass - and include those statistics in
-`EngineCoreOutputs`.
+引擎核心进程会收集一些调度器相关的关键统计数据，例如上一次调度后仍在等待或已被调度的请求数，并将这些数据包含在 `EngineCoreOutputs` 中。
 
-### Engine Core Events
+### 引擎核心事件
 
-The engine core will also record the timestamp of certain per-request
-events so that the frontend can calculate the interval between these
-events.
+引擎核心还会记录每个请求一些关键事件的时间戳，供前端计算事件间的时间间隔。
 
-The events are:
+这些事件包括：
 
-- `QUEUED` - when the request was received by the engine core and
-  added to the scheduler queue.
-- `SCHEDULED` - when the request was first scheduled for execution.
-- `PREEMPTED` - the request has been put back in the waiting queue
-  in order to make room for other requests to complete. It will be
-  re-scheduled in future and re-start its prefill phase.
-- `NEW_TOKENS` - when the output included in `EngineCoreOutput` was
-  generated. Since this is common to all requests in a given
-  iteration, we use a single timestamp on `EngineCoreOutputs` to
-  record this event.
+- `QUEUED` - 请求被引擎核心接收并加入调度队列的时刻
+- `SCHEDULED` - 请求首次被调度执行的时刻
+- `PREEMPTED` - 请求被放回等待队列（为其他请求腾空间），未来会重新调度并重新进入 prefill 阶段
+- `NEW_TOKENS` - `EngineCoreOutput` 输出中的新 token 被生成的时刻。对同一轮迭代的所有请求，用同一个时间戳记录。
 
-And the calculated intervals are:
+间隔计算如下：
 
-- Queue interval - between `QUEUED` and most recent `SCHEDULED`.
-- Prefill interval - between most recent `SCHEDULED` and the subsequent
-  first `NEW_TOKENS`.
-- Decode interval - between first (after the most recent `SCHEDULED`) and
-  last `NEW_TOKENS`.
-- Inference interval - between most recent `SCHEDULED` and last `NEW_TOKENS`.
-- Inter-token interval - between successive `NEW_TOKENS`.
+- 排队间隔：`QUEUED` 到最近一次 `SCHEDULED` 的时间
+- 预填充间隔：最近一次 `SCHEDULED` 到首次 `NEW_TOKENS`
+- 解码间隔：首次（在最近一次 `SCHEDULED` 后）到最后一次 `NEW_TOKENS`
+- 推理间隔：最近一次 `SCHEDULED` 到最后一次 `NEW_TOKENS`
+- Token 间隔：连续两次 `NEW_TOKENS` 之间的时间
 
-Put another way:
+换句话说：
 
-![Interval calculations - common case](../assets/design/metrics/intervals-1.png)
+![常规间隔计算示意图](../assets/design/metrics/intervals-1.png)
 
-We explored the possibility of having the frontend calculate these
-intervals using the timing of events visible by the frontend. However,
-the frontend does not have visibility into the timing of the `QUEUED`
-and `SCHEDULED` events and, since we need to calculate intervals based
-on monotonic timestamps from the same process ... we need the engine
-core to record timestamps for all of these events.
+我们曾尝试让前端自行计算这些间隔，但前端无法获知 `QUEUED` 和 `SCHEDULED` 的具体时间。而且要保证间隔计算用的是同一进程的单调时间戳，所以必须由引擎核心为所有相关事件记录时间戳。
 
-#### Interval Calculations vs Preemptions
+#### 间隔计算与抢占（Preemption）
 
-When a preemption occurs during decode, since any already generated
-tokens are reused, we consider the preemption as affecting the
-inter-token, decode, and inference intervals.
+如果在解码阶段发生抢占（Preemption），已生成的 token 会被复用，抢占影响的是 token 间隔、解码间隔和推理间隔。
 
-![Interval calculations - preempted decode](../assets/design/metrics/intervals-2.png)
+![解码期间抢占的间隔计算](../assets/design/metrics/intervals-2.png)
 
-When a preemption occurs during prefill (assuming such an event
-is possible), we consider the preemption as affecting the
-time-to-first-token and prefill intervals.
+如果在预填充阶段发生抢占（假设这种情况可能出现），抢占会影响首 token 时间和预填充间隔。
 
-![Interval calculations - preempted prefill](../assets/design/metrics/intervals-3.png)
+![预填充期间抢占的间隔计算](../assets/design/metrics/intervals-3.png)
 
-### Frontend Stats Collection
+### 前端统计收集
 
-As the frontend processes a single `EngineCoreOutputs` - i.e. the
-output from a single engine core iteration - it collects various
-statistics relating to that iteration:
+每处理一次 `EngineCoreOutputs`（即引擎核心一次迭代的输出），前端会收集以下统计信息：
 
-- The total number of new tokens generated in this iteration.
-- The total number of prompt tokens processed by the prefills that
-  completed in this iteration.
-- The queue intervals for any requests that were scheduled in this
-  iteration.
-- The prefill intervals for any requests that completed prefill in
-  this iteration.
-- The inter-token intervals (Time Per Output Token, TPOT), for all
-  requests included in this iteration.
-- The Time-To-First-Token (TTFT) for any requests that completed
-  prefill in this iteration. However, we calculate this interval
-  relative to when the request was first received by the frontend
-  (`arrival_time`) in order to account for input processing time.
+- 本次迭代中新生成的 token 总数
+- 本次迭代完成预填充的请求所处理的提示词 token 总数
+- 本次迭代被调度请求的排队时间间隔
+- 本次迭代完成预填充请求的预填充间隔
+- 所有包含在本次迭代中的请求的 token 间隔（TPOT）
+- 本次迭代完成预填充的请求的 TTFT（首 token 时间），此间隔是相对于请求首次到达前端（`arrival_time`）计算的，以考虑输入处理时间
 
-For any requests that were completed in a given iteration, we also
-record:
+对于本次迭代完成的请求，还会记录：
 
-- The inference and decode intervals - relative to the scheduled and
-  first token events, as described above.
-- End-to-end latency - the interval between frontend `arrival_time`
-  and the frontend receiving the final token.
+- 推理和解码间隔（如前文所述，与调度和首 token 事件相关）
+- 端到端延迟（前端 `arrival_time` 到收到最后一个 token 的时间）
 
-### Metrics Publishing - Logging
+### 指标发布 - 日志
 
-The `LoggingStatLogger` metrics publisher outputs a log `INFO` message
-every 5 seconds with some key metrics:
+`LoggingStatLogger` 指标发布器每 5 秒输出一次 INFO 日志，内容包括：
 
-- The current number of running/waiting requests
-- The current GPU cache usage
-- The number of prompt tokens processed per second over the past 5
-  seconds
-- The number of new tokens generated per second over the past 5
-  seconds
-- The prefix cache hit rate over the most recent 1k kv-cache block queries
+- 当前运行/等待中的请求数
+- 当前 GPU 缓存使用率
+- 过去 5 秒处理的提示词 token 数（吞吐率）
+- 过去 5 秒生成的新 token 数（生成速率）
+- 最近 1000 次 kv-cache 查询的前缀缓存命中率
 
-### Metrics Publishing - Prometheus
+### 指标发布 - Prometheus
 
-The `PrometheusStatLogger` metrics publisher makes the metrics
-available via a `/metrics` HTTP endpoint in a Prometheus-compatible
-format. A Prometheus instance can then be configured to poll this
-endpoint (e.g. every second) and record the values in its time-series
-database. Prometheus is often used via Grafana, allowing these metrics
-to be graphed over time.
+`PrometheusStatLogger` 指标发布器通过 `/metrics` HTTP 端点提供 Prometheus 兼容格式的指标。Prometheus 实例可定期（例如每秒）拉取数据，存储到自身的时序数据库。通常结合 Grafana 实现可视化。
 
-Prometheus supports the following metric types:
+Prometheus 支持以下指标类型：
 
-- Counter: a value that will increase over time, never reducing, and
-  generally reset to zero when the vLLM instance restarts. For
-  example, the number of tokens generated over the lifetime of the
-  instance.
-- Gauge: a value that goes up and down, for example the number of
-  requests currently scheduled for execution.
-- Histogram: a count of metric samples, recorded in buckets. For
-  example, the number of requests whose TTFT was <1ms, <5ms, <10ms,
-  <20ms, and so on.
+- Counter（计数器）：只增不减，通常在 vLLM 实例重启时归零。例如，实例运行期间生成的 token 总数。
+- Gauge（仪表盘）：数值可增可减，比如当前调度中的请求数。
+- Histogram（直方图）：按区间统计样本数量。例如，TTFT 在 <1ms、<5ms、<10ms、<20ms 等区间内的请求数量。
 
-Prometheus metrics can also be labelled, allowing metrics to be
-combined according to matching labels. In vLLM, we add a `model_name`
-label to every metric which includes the name of the model served by
-that instance.
+Prometheus 的指标还可以打标签，方便按标签聚合。vLLM 每条指标都会加上 `model_name` 标签，用于标识具体服务的模型。
 
-Example output:
+示例输出：
 
 ```bash
 $ curl http://0.0.0.0:8000/metrics
@@ -322,367 +257,4 @@ vllm:request_success_total{finished_reason="abort",model_name="meta-llama/Llama-
 ...
 # HELP vllm:time_to_first_token_seconds Histogram of time to first token in seconds.
 # TYPE vllm:time_to_first_token_seconds histogram
-vllm:time_to_first_token_seconds_bucket{le="0.001",model_name="meta-llama/Llama-3.1-8B-Instruct"} 0.0
-vllm:time_to_first_token_seconds_bucket{le="0.005",model_name="meta-llama/Llama-3.1-8B-Instruct"} 0.0
-vllm:time_to_first_token_seconds_bucket{le="0.01",model_name="meta-llama/Llama-3.1-8B-Instruct"} 0.0
-vllm:time_to_first_token_seconds_bucket{le="0.02",model_name="meta-llama/Llama-3.1-8B-Instruct"} 13.0
-vllm:time_to_first_token_seconds_bucket{le="0.04",model_name="meta-llama/Llama-3.1-8B-Instruct"} 97.0
-vllm:time_to_first_token_seconds_bucket{le="0.06",model_name="meta-llama/Llama-3.1-8B-Instruct"} 123.0
-vllm:time_to_first_token_seconds_bucket{le="0.08",model_name="meta-llama/Llama-3.1-8B-Instruct"} 138.0
-vllm:time_to_first_token_seconds_bucket{le="0.1",model_name="meta-llama/Llama-3.1-8B-Instruct"} 140.0
-vllm:time_to_first_token_seconds_count{model_name="meta-llama/Llama-3.1-8B-Instruct"} 140.0
-```
-
-!!! note
-    The choice of histogram buckets to be most useful to users
-    across a broad set of use cases is not straightforward and will
-    require refinement over time.
-
-### Cache Config Info
-
-`prometheus_client` has support for
-[Info metrics](https://prometheus.github.io/client_python/instrumenting/info/)
-which are equivalent to a `Gauge` whose value is permanently set to 1,
-but exposes interesting key/value pair information via labels. This is
-used for information about an instance that does not change - so it
-only needs to be observed at startup - and allows comparing across
-instances in Prometheus.
-
-We use this concept for the `vllm:cache_config_info` metric:
-
-```text
-# HELP vllm:cache_config_info Information of the LLMEngine CacheConfig
-# TYPE vllm:cache_config_info gauge
-vllm:cache_config_info{block_size="16",cache_dtype="auto",calculate_kv_scales="False",cpu_offload_gb="0",enable_prefix_caching="False",gpu_memory_utilization="0.9",...} 1.0
-```
-
-However, `prometheus_client` has
-[never supported Info metrics in multiprocessing mode](https://github.com/prometheus/client_python/pull/300) -
-for [unclear reasons](gh-pr:7279#discussion_r1710417152). We
-simply use a `Gauge` metric set to 1 and
-`multiprocess_mode="mostrecent"` instead.
-
-### LoRA Metrics
-
-The `vllm:lora_requests_info` `Gauge` is somewhat similar, except the
-value is the current wall-clock time, and is updated every iteration.
-
-The label names used are:
-
-- `running_lora_adapters`: a per-adapter count of the number requests
-  running using that adapter, formatted as a comma-separated string.
-- `waiting_lora_adapters`: similar, except counting requests that are
-  waiting to be scheduled.
-- `max_lora` - the static "max number of LoRAs in a single batch."
-  configuration.
-
-Encoding a running/waiting counts for multiple adapters in a
-comma-separated string seems quite misguided - we could use labels to
-distinguish between per-adapter counts. This should be revisited.
-
-Note that `multiprocess_mode="livemostrecent"` is used - the most
-recent metric is used, but only from currently running processes.
-
-This was added in <https://github.com/vllm-project/vllm/pull/9477> and there is
-[at least one known user](https://github.com/kubernetes-sigs/gateway-api-inference-extension/pull/54).
-If we revisit this design and deprecate the old metric, we should
-coordinate with downstream users so they can migrate before the removal.
-
-### Prefix Cache metrics
-
-The discussion in <https://github.com/vllm-project/vllm/issues/10582> about adding prefix cache metrics yielded
-some interesting points which may be relevant to how we approach
-future metrics.
-
-Every time the prefix cache is queried, we record the number of tokens
-queried and the number of queried tokens present in the cache
-(i.e. hits).
-
-However, the metric of interest is the hit rate - i.e. the number of
-hits per query.
-
-In the case of logging, we expect the user is best served by
-calculating the hit rate over a fixed number of the most recent
-queries (the interval is fixed to 1k most recent queries for now).
-
-In the case of Prometheus though, we should take advantage of the
-time-series nature of Prometheus and allow the user to calculate the
-hit rate over an interval of their choosing. For example, a PromQL
-query to calculate the hit interval of the past 5 minutes:
-
-```text
-rate(cache_query_hit[5m]) / rate(cache_query_total[5m])
-```
-
-To achieve this, we should record the queries and hits as counters in
-Prometheus, rather than recording the hit rate as a gauge.
-
-## Deprecated Metrics
-
-### How To Deprecate
-
-Deprecating metrics shouldn't be taken lightly. Users may not notice a
-metric has been deprecated, and may be quite inconvenienced when it is
-suddenly (from their perspective) when it is removed, even if there is
-an equivalent metric for them to use.
-
-As an example, see how `vllm:avg_prompt_throughput_toks_per_s` was
-[deprecated](https://github.com/vllm-project/vllm/pull/2764) (with a comment in the code),
-[removed](https://github.com/vllm-project/vllm/pull/12383), and then [noticed by a user](https://github.com/vllm-project/vllm/issues/13218).
-
-In general:
-
-1. We should be cautious about deprecating metrics, especially since
-   it can be hard to predict the user impact.
-2. We should include a prominent deprecation notice in the help string
-   that is included in the `/metrics' output.
-3. We should list deprecated metrics in user-facing documentation and
-   release notes.
-4. We should consider hiding deprecated metrics behind a CLI argument
-   in order to give administrators
-   [an escape hatch](https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/#show-hidden-metrics)
-   for some time before deleting them.
-
-See the [deprecation policy](../contributing/deprecation_policy.md) for
-the project-wide deprecation policy.
-
-### Unimplemented - `vllm:tokens_total`
-
-Added by <https://github.com/vllm-project/vllm/pull/4464>, but apparently never implemented. This can just be
-removed.
-
-### Duplicated - Queue Time
-
-The `vllm:time_in_queue_requests` Histogram metric was added by
-<https://github.com/vllm-project/vllm/pull/9659> and its calculation is:
-
-```python
-    self.metrics.first_scheduled_time = now
-    self.metrics.time_in_queue = now - self.metrics.arrival_time
-```
-
-Two weeks later, <https://github.com/vllm-project/vllm/pull/4464> added `vllm:request_queue_time_seconds` leaving
-us with:
-
-```python
-if seq_group.is_finished():
-    if (seq_group.metrics.first_scheduled_time is not None and
-            seq_group.metrics.first_token_time is not None):
-        time_queue_requests.append(
-            seq_group.metrics.first_scheduled_time -
-            seq_group.metrics.arrival_time)
-    ...
-    if seq_group.metrics.time_in_queue is not None:
-        time_in_queue_requests.append(
-            seq_group.metrics.time_in_queue)
-```
-
-This seems duplicative, and one of them should be removed. The latter
-is used by the Grafana dashboard, so we should deprecate or remove the
-former.
-
-### Prefix Cache Hit Rate
-
-See above - we now expose 'queries' and 'hits' counters rather than a
-'hit rate' gauge.
-
-### KV Cache Offloading
-
-Two legacy metrics relate to a "swapped" preemption mode that is no
-longer relevant in v1:
-
-- `vllm:num_requests_swapped`
-- `vllm:cpu_cache_usage_perc`
-
-In this mode, when a request is preempted (e.g. to make room in KV
-cache to complete other requests), we swap kv cache blocks out to CPU
-memory. This is also known as "KV cache offloading" and is configured
-with `--swap-space` and `--preemption-mode`.
-
-Historically, [vLLM has long supported beam search](https://github.com/vllm-project/vllm/issues/6226). The
-SequenceGroup encapsulated the idea of N Sequences which
-all shared the same prompt kv blocks. This enabled KV cache block
-sharing between requests, and copy-on-write to do branching. CPU
-swapping was intended for these beam search like cases.
-
-Later, the concept of prefix caching was introduced, which allowed KV
-cache blocks to be shared implicitly. This proved to be a better
-option than CPU swapping since blocks can be evicted slowly on demand
-and the part of the prompt that was evicted can be recomputed.
-
-SequenceGroup was removed in V1, although a replacement will be
-required for "parallel sampling" (`n>1`).
-[Beam search was moved out of the core](https://github.com/vllm-project/vllm/issues/8306). There was a
-lot of complex code for a very uncommon feature.
-
-In V1, with prefix caching being better (zero over head) and therefore
-on by default, the preemption and recompute strategy should work
-better.
-
-## Future Work
-
-### Parallel Sampling
-
-Some legacy metrics are only relevant in the context of "parallel
-sampling". This is where the `n` parameter in a request is used to
-request multiple completions from the same prompt.
-
-As part of adding parallel sampling support in <https://github.com/vllm-project/vllm/pull/10980>, we should
-also add these metrics.
-
-- `vllm:request_params_n` (Histogram)
-
-  Observes the value of the 'n' parameter of every finished request.
-
-- `vllm:request_max_num_generation_tokens` (Histogram)
-
-  Observes the maximum output length of all sequences in every finished
-  sequence group. In the absence of parallel sampling, this is
-  equivalent to `vllm:request_generation_tokens`.
-
-### Speculative Decoding
-
-Some legacy metrics are specific to "speculative decoding". This is where
-we generate candidate tokens using a faster, approximate method or
-model and then validate those tokens with the larger model.
-
-- `vllm:spec_decode_draft_acceptance_rate` (Gauge)
-- `vllm:spec_decode_efficiency` (Gauge)
-- `vllm:spec_decode_num_accepted_tokens_total` (Counter)
-- `vllm:spec_decode_num_draft_tokens_total` (Counter)
-- `vllm:spec_decode_num_emitted_tokens_total` (Counter)
-
-There is a PR under review (<https://github.com/vllm-project/vllm/pull/12193>) to add "prompt lookup (ngram)"
-speculative decoding to v1. Other techniques will follow. We should
-revisit these metrics in this context.
-
-!!! note
-    We should probably expose acceptance rate as separate accepted
-    and draft counters, like we do for prefix caching hit rate. Efficiency
-    likely also needs similar treatment.
-
-### Autoscaling and Load-balancing
-
-A common use case for our metrics is to support automated scaling of
-vLLM instances.
-
-For related discussion from the
-[Kubernetes Serving Working Group](https://github.com/kubernetes/community/tree/master/wg-serving),
-see:
-
-- [Standardizing Large Model Server Metrics in Kubernetes](https://docs.google.com/document/d/1SpSp1E6moa4HSrJnS4x3NpLuj88sMXr2tbofKlzTZpk)
-- [Benchmarking LLM Workloads for Performance Evaluation and Autoscaling in Kubernetes](https://docs.google.com/document/d/1k4Q4X14hW4vftElIuYGDu5KDe2LtV1XammoG-Xi3bbQ)
-- [Inference Perf](https://github.com/kubernetes-sigs/wg-serving/tree/main/proposals/013-inference-perf)
-- <https://github.com/vllm-project/vllm/issues/5041> and <https://github.com/vllm-project/vllm/pull/12726>.
-  
-This is a non-trivial topic. Consider this comment from Rob:
-
-> I think this metric should focus on trying to estimate what the max
-> concurrency that will cause the average request length > queries per
-> second ... since this is really what will "saturate" the server.
-
-A clear goal is that we should expose the metrics required to detect
-this saturation point, so administrators can implement auto-scaling
-rules based on those. However, in order to do so, we need to have a
-clear view on how an administrator (and automated monitoring system)
-should judge an instance as approaching saturation:
-
-> To identify, what is the saturation point for model server compute
-> (the inflection point where we cannot get more throughput with a
-> higher request rate, but start to incur additional latency) so we
-> can autoscale effectively?
-
-### Metric Naming
-
-Our approach to naming metrics probably deserves to be revisited:
-
-1. The use of colons in metric names seems contrary to
-   ["colons are reserved for user defined recording rules"](https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels).
-2. Most of our metrics follow the convention of ending with units, but
-   not all do.
-3. Some of our metric names end with `_total`:
-
-    If there is a suffix of `_total` on the metric name, it will be removed. When
-    exposing the time series for counter, a `_total` suffix will be added. This is
-    for compatibility between OpenMetrics and the Prometheus text format, as OpenMetrics
-    requires the `_total` suffix.
-
-### Adding More Metrics
-
-There is no shortage of ideas for new metrics:
-
-- Examples from other projects like
-  [TGI](https://github.com/IBM/text-generation-inference?tab=readme-ov-file#metrics)
-- Proposals arising from specific use cases, like the Kubernetes
-  auto-scaling topic above
-- Proposals that might arise out of standardisation efforts like
-  [OpenTelemetry Semantic Conventions for Gen AI](https://github.com/open-telemetry/semantic-conventions/tree/main/docs/gen-ai).
-
-We should be cautious in our approach to adding new metrics. While
-metrics are often relatively straightforward to add:
-
-1. They can be difficult to remove - see the section on deprecation
-   above.
-2. They can have a meaningful performance impact when enabled. And
-   metrics are usually of very limited use unless they can be enabled
-   by default and in production.
-3. They have an impact on development and maintenance of the
-   project. Every metric added over time has made this effort more
-   time-consuming, and perhaps not all metrics justify this ongoing
-   investment in their maintenance.
-
-## Tracing - OpenTelemetry
-
-Metrics provide an aggregated view over time of the system's
-performance and health. Tracing, on the other hand, tracks individual
-requests as they move through different services and components. Both
-fall under the more general heading of "Observability".
-
-vLLM has support for OpenTelemetry tracing:
-
-- Added by <https://github.com/vllm-project/vllm/pull/4687> and reinstated by <https://github.com/vllm-project/vllm/pull/20372>
-- Configured with `--oltp-traces-endpoint` and `--collect-detailed-traces`
-- [OpenTelemetry blog post](https://opentelemetry.io/blog/2024/llm-observability/)
-- [User-facing docs](../examples/online_serving/opentelemetry.md)
-- [Blog post](https://medium.com/@ronen.schaffer/follow-the-trail-supercharging-vllm-with-opentelemetry-distributed-tracing-aa655229b46f)
-- [IBM product docs](https://www.ibm.com/docs/en/instana-observability/current?topic=mgaa-monitoring-large-language-models-llms-vllm-public-preview)
-
-OpenTelemetry has a
-[Gen AI Working Group](https://github.com/open-telemetry/community/blob/main/projects/gen-ai.md).
-
-Since metrics is a big enough topic on its own, we consider the topic
-of tracing to be quite separate from metrics.
-
-### OpenTelemetry Model Forward vs Execute Time
-
-The current implementation exposes the following two metrics:
-
-- `vllm:model_forward_time_milliseconds` (Histogram) - The time spent
-  in the model forward pass when this request was in the batch.
-- `vllm:model_execute_time_milliseconds` (Histogram) - The time spent
-  in the model execute function. This will include model forward,
-  block/sync across workers, cpu-gpu sync time and sampling time.
-
-These metrics are only enabled when OpenTelemetry tracing is enabled
-and if `--collect-detailed-traces=all/model/worker` is used. The
-documentation for this option states:
-
-> collect detailed traces for the specified modules. This involves
-> use of possibly costly and or blocking operations and hence might
-> have a performance impact.
-
-The metrics were added by <https://github.com/vllm-project/vllm/pull/7089> and who up in an OpenTelemetry trace
-as:
-
-```text
--> gen_ai.latency.time_in_scheduler: Double(0.017550230026245117)
--> gen_ai.latency.time_in_model_forward: Double(3.151565277099609)
--> gen_ai.latency.time_in_model_execute: Double(3.6468167304992676)
-```
-
-We already have `inference_time` and `decode_time` metrics, so the
-question is whether there are sufficiently common use cases for the
-higher-resolution timings to justify the overhead.
-
-Since we are going to treat the question of OpenTelemetry support
-separately, we will include these particular metrics under that topic.
+vllm:time_to_first_token_seconds_bucket{le="0.001",model_name="meta-llama/Llama-3

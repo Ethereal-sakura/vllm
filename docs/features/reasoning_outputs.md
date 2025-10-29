@@ -1,48 +1,48 @@
-# Reasoning Outputs
+# 推理输出
 
-vLLM offers support for reasoning models like [DeepSeek R1](https://huggingface.co/deepseek-ai/DeepSeek-R1), which are designed to generate outputs containing both reasoning steps and final conclusions.
+vLLM 支持推理（reasoning）模型，例如 [DeepSeek R1](https://huggingface.co/deepseek-ai/DeepSeek-R1)，这些模型能够生成包含推理过程和最终结论的输出内容。
 
-Reasoning models return an additional `reasoning_content` field in their outputs, which contains the reasoning steps that led to the final conclusion. This field is not present in the outputs of other models.
+推理模型的输出中会多出一个 `reasoning_content` 字段，里面是模型推理得到最终结论的详细过程。这个字段在其他类型的模型输出里是没有的。
 
-## Supported Models
+## 支持的模型
 
-vLLM currently supports the following reasoning models:
+目前 vLLM 支持以下推理模型：
 
-| Model Series | Parser Name | Structured Output Support | Tool Calling |
+| 模型系列 | 解析器名称 | 结构化输出支持 | 工具调用 |
 |--------------|-------------|------------------|-------------|
-| [DeepSeek R1 series](https://huggingface.co/collections/deepseek-ai/deepseek-r1-678e1e131c0169c0bc89728d) | `deepseek_r1` | `json`, `regex` | ❌ |
+| [DeepSeek R1 系列](https://huggingface.co/collections/deepseek-ai/deepseek-r1-678e1e131c0169c0bc89728d) | `deepseek_r1` | `json`, `regex` | ❌ |
 | [DeepSeek-V3.1](https://huggingface.co/collections/deepseek-ai/deepseek-v31-68a491bed32bd77e7fca048f) | `deepseek_v3` | `json`, `regex` | ❌ |
-| [ERNIE-4.5-VL series](https://huggingface.co/baidu/ERNIE-4.5-VL-28B-A3B-PT) | `ernie45` | `json`, `regex` | ❌ |
+| [ERNIE-4.5-VL 系列](https://huggingface.co/baidu/ERNIE-4.5-VL-28B-A3B-PT) | `ernie45` | `json`, `regex` | ❌ |
 | [ERNIE-4.5-21B-A3B-Thinking](https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking) | `ernie45` | `json`, `regex` | ✅ |
-| [GLM-4.5 series](https://huggingface.co/collections/zai-org/glm-45-687c621d34bda8c9e4bf503b) | `glm45` | `json`, `regex` | ✅ |
-| [Hunyuan A13B series](https://huggingface.co/collections/tencent/hunyuan-a13b-685ec38e5b46321e3ea7c4be) | `hunyuan_a13b` | `json`, `regex` | ✅ |
-| [IBM Granite 3.2 language models](https://huggingface.co/collections/ibm-granite/granite-32-language-models-67b3bc8c13508f6d064cff9a) | `granite` | ❌ | ❌ |
+| [GLM-4.5 系列](https://huggingface.co/collections/zai-org/glm-45-687c621d34bda8c9e4bf503b) | `glm45` | `json`, `regex` | ✅ |
+| [Hunyuan A13B 系列](https://huggingface.co/collections/tencent/hunyuan-a13b-685ec38e5b46321e3ea7c4be) | `hunyuan_a13b` | `json`, `regex` | ✅ |
+| [IBM Granite 3.2 语言模型](https://huggingface.co/collections/ibm-granite/granite-32-language-models-67b3bc8c13508f6d064cff9a) | `granite` | ❌ | ❌ |
 | [MiniMax-M2](https://huggingface.co/MiniMaxAI/MiniMax-M2) | `minimax_m2_append_think` | `json`, `regex` | ✅ |
-| [Qwen3 series](https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f) | `qwen3` | `json`, `regex` | ✅ |
+| [Qwen3 系列](https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f) | `qwen3` | `json`, `regex` | ✅ |
 | [QwQ-32B](https://huggingface.co/Qwen/QwQ-32B) | `deepseek_r1` | `json`, `regex` | ✅ |
 
 !!! note
-    IBM Granite 3.2 and DeepSeek-V3.1 reasoning is disabled by default; to enable it, you must also pass `thinking=True` in your `chat_template_kwargs`.
-    The reasoning feature for the Qwen3 series is enabled by default. To disable it, you must pass `enable_thinking=False` in your `chat_template_kwargs`.
-    DeepSeek-V3.1 tool calling is supported in non-thinking mode.
+    IBM Granite 3.2 和 DeepSeek-V3.1 的推理模式默认是关闭的，如果需要开启，还需在 `chat_template_kwargs` 中传入 `thinking=True`
+    Qwen3 系列的推理功能默认开启，如果想关闭，则需传入 `enable_thinking=False` 到 `chat_template_kwargs`
+    DeepSeek-V3.1 的工具调用仅支持非推理（non-thinking）模式
 
-## Quickstart
+## 快速上手
 
-To use reasoning models, you need to specify the `--reasoning-parser` flags when making a request to the chat completion endpoint. The `--reasoning-parser` flag specifies the reasoning parser to use for extracting reasoning content from the model output.
+如需使用推理模型，在调用聊天补全接口时需要通过 `--reasoning-parser` 参数指定推理内容解析器，用于从模型输出中提取推理内容。
 
 ```bash
 vllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B \
     --reasoning-parser deepseek_r1
 ```
 
-Next, make a request to the model that should return the reasoning content in the response.
+接下来，向模型发送请求，模型响应中会包含推理内容。
 
 ??? code
 
     ```python
     from openai import OpenAI
 
-    # Modify OpenAI's API key and API base to use vLLM's API server.
+    # 修改 OpenAI 的 API key 和 API base，指向 vLLM 的 API 服务地址
     openai_api_key = "EMPTY"
     openai_api_base = "http://localhost:8000/v1"
 
@@ -54,10 +54,10 @@ Next, make a request to the model that should return the reasoning content in th
     models = client.models.list()
     model = models.data[0].id
 
-    # Round 1
-    messages = [{"role": "user", "content": "9.11 and 9.8, which is greater?"}]
-    # For granite, add: `extra_body={"chat_template_kwargs": {"thinking": True}}`
-    # For Qwen3 series, if you want to disable thinking in reasoning mode, add:
+    # 第一次对话
+    messages = [{"role": "user", "content": "9.11 和 9.8 哪个更大？"}]
+    # 如果是 granite，需要加上：`extra_body={"chat_template_kwargs": {"thinking": True}}`
+    # 如果是 Qwen3 系列，想关闭推理模式则加上：
     # extra_body={"chat_template_kwargs": {"enable_thinking": False}}
     response = client.chat.completions.create(model=model, messages=messages)
 
@@ -68,11 +68,11 @@ Next, make a request to the model that should return the reasoning content in th
     print("content:", content)
     ```
 
-The `reasoning_content` field contains the reasoning steps that led to the final conclusion, while the `content` field contains the final conclusion.
+`reasoning_content` 字段包含了模型给出结论前的整个推理过程，而 `content` 字段就是最终的结论。
 
-## Streaming chat completions
+## 流式输出 chat completions
 
-Streaming chat completions are also supported for reasoning models. The `reasoning_content` field is available in the `delta` field in [chat completion response chunks](https://platform.openai.com/docs/api-reference/chat/streaming).
+推理模型也支持流式聊天补全。在流式输出的 [chat completion response chunks](https://platform.openai.com/docs/api-reference/chat/streaming) 返回数据中，`reasoning_content` 会出现在 `delta` 字段里。
 
 ??? console "Json"
 
@@ -97,14 +97,14 @@ Streaming chat completions are also supported for reasoning models. The `reasoni
     }
     ```
 
-OpenAI Python client library does not officially support `reasoning_content` attribute for streaming output. But the client supports extra attributes in the response. You can use `hasattr` to check if the `reasoning_content` attribute is present in the response. For example:
+OpenAI 的 Python 客户端库暂不支持流式输出中的 `reasoning_content` 属性，但客户端允许响应中包含自定义属性。你可以用 `hasattr` 判断响应中是否存在 `reasoning_content` 字段。例如：
 
 ??? code
 
     ```python
     from openai import OpenAI
 
-    # Modify OpenAI's API key and API base to use vLLM's API server.
+    # 修改 OpenAI 的 API key 和 API base，指向 vLLM 的 API 服务地址
     openai_api_key = "EMPTY"
     openai_api_base = "http://localhost:8000/v1"
 
@@ -116,9 +116,9 @@ OpenAI Python client library does not officially support `reasoning_content` att
     models = client.models.list()
     model = models.data[0].id
 
-    messages = [{"role": "user", "content": "9.11 and 9.8, which is greater?"}]
-    # For granite, add: `extra_body={"chat_template_kwargs": {"thinking": True}}`
-    # For Qwen3 series, if you want to disable thinking in reasoning mode, add:
+    messages = [{"role": "user", "content": "9.11 和 9.8 哪个更大？"}]
+    # 如果是 granite，需要加上：`extra_body={"chat_template_kwargs": {"thinking": True}}`
+    # 如果是 Qwen3 系列，想关闭推理模式则加上：
     # extra_body={"chat_template_kwargs": {"enable_thinking": False}}
     stream = client.chat.completions.create(
         model=model,
@@ -126,13 +126,12 @@ OpenAI Python client library does not officially support `reasoning_content` att
         stream=True,
     )
 
-    print("client: Start streaming chat completions...")
+    print("client: 开始流式输出 chat completions ...")
     printed_reasoning_content = False
     printed_content = False
 
     for chunk in stream:
-        # Safely extract reasoning_content and content from delta,
-        # defaulting to None if attributes don't exist or are empty strings
+        # 安全地从 delta 中提取 reasoning_content 和 content，不存在时为 None
         reasoning_content = (
             getattr(chunk.choices[0].delta, "reasoning_content", None) or None
         )
@@ -147,15 +146,15 @@ OpenAI Python client library does not officially support `reasoning_content` att
             if not printed_content:
                 printed_content = True
                 print("\ncontent:", end="", flush=True)
-            # Extract and print the content
+            # 输出最终内容
             print(content, end="", flush=True)
     ```
 
-Remember to check whether the `reasoning_content` exists in the response before accessing it. You could check out the [example](https://github.com/vllm-project/vllm/blob/main/examples/online_serving/openai_chat_completion_with_reasoning_streaming.py).
+在访问 `reasoning_content` 前，请务必判断该字段是否存在。你可以参考 [example](https://github.com/vllm-project/vllm/blob/main/examples/online_serving/openai_chat_completion_with_reasoning_streaming.py) 里的代码示例。
 
-## Tool Calling
+## 工具调用（Tool Calling）
 
-The reasoning content is also available when both tool calling and the reasoning parser are enabled. Additionally, tool calling only parses functions from the `content` field, not from the `reasoning_content`.
+当工具调用和推理内容解析器同时启用时，推理内容同样会在响应中返回。另外，工具调用只会从 `content` 字段中解析函数调用，不会从 `reasoning_content` 里解析。
 
 ??? code
 
@@ -169,11 +168,11 @@ The reasoning content is also available when both tool calling and the reasoning
             "type": "function",
             "function": {
                 "name": "get_weather",
-                "description": "Get the current weather in a given location",
+                "description": "获取指定地点的当前天气",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "location": {"type": "string", "description": "City and state, e.g., 'San Francisco, CA'"},
+                        "location": {"type": "string", "description": "城市和州，例如 'San Francisco, CA'"},
                         "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
                     },
                     "required": ["location", "unit"],
@@ -184,7 +183,7 @@ The reasoning content is also available when both tool calling and the reasoning
 
     response = client.chat.completions.create(
         model=client.models.list().data[0].id,
-        messages=[{"role": "user", "content": "What's the weather like in San Francisco?"}],
+        messages=[{"role": "user", "content": "旧金山的天气怎么样？"}],
         tools=tools,
         tool_choice="auto",
     )
@@ -197,28 +196,26 @@ The reasoning content is also available when both tool calling and the reasoning
     print(f"Arguments: {tool_call.arguments}")
     ```
 
-For more examples, please refer to [examples/online_serving/openai_chat_completion_tool_calls_with_reasoning.py](../../examples/online_serving/openai_chat_completion_tool_calls_with_reasoning.py).
+更多示例请参考 [examples/online_serving/openai_chat_completion_tool_calls_with_reasoning.py](../../examples/online_serving/openai_chat_completion_tool_calls_with_reasoning.py)
 
-## Limitations
+## 已知限制
 
-- The reasoning content is only available for online serving's chat completion endpoint (`/v1/chat/completions`).
+- 推理内容目前仅支持在线服务的聊天补全接口（`/v1/chat/completions`）。
 
-## How to support a new reasoning model
+## 如何支持新的推理模型
 
-You can add a new `ReasoningParser` similar to [vllm/reasoning/deepseek_r1_reasoning_parser.py](../../vllm/reasoning/deepseek_r1_reasoning_parser.py).
+你可以仿照 [vllm/reasoning/deepseek_r1_reasoning_parser.py](../../vllm/reasoning/deepseek_r1_reasoning_parser.py) 添加新的 `ReasoningParser`。
 
 ??? code
 
     ```python
-    # import the required packages
+    # 导入所需包
 
     from vllm.reasoning import ReasoningParser, ReasoningParserManager
     from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                                 DeltaMessage)
 
-    # define a reasoning parser and register it to vllm
-    # the name list in register_module can be used
-    # in --reasoning-parser.
+    # 定义并注册推理解析器，register_module 里的名称可以在 --reasoning-parser 参数中使用
     @ReasoningParserManager.register_module(["example"])
     class ExampleParser(ReasoningParser):
         def __init__(self, tokenizer: AnyTokenizer):
@@ -234,11 +231,8 @@ You can add a new `ReasoningParser` similar to [vllm/reasoning/deepseek_r1_reaso
             delta_token_ids: Sequence[int],
         ) -> DeltaMessage | None:
             """
-            Instance method that should be implemented for extracting reasoning
-            from an incomplete response; for use when handling reasoning calls and
-            streaming. Has to be an instance method because  it requires state -
-            the current tokens/diffs, but also the information about what has
-            previously been parsed and extracted (see constructor)
+            实例方法，用于在流式响应时，从未完成的输出中提取推理内容。
+            需要用到当前的 token 差异以及之前已解析和提取的内容（见构造函数）。
             """
 
         def extract_reasoning_content(
@@ -247,25 +241,24 @@ You can add a new `ReasoningParser` similar to [vllm/reasoning/deepseek_r1_reaso
             request: ChatCompletionRequest | ResponsesRequest,
         ) -> tuple[str | None, str | None]:
             """
-            Extract reasoning content from a complete model-generated string.
+            从完整的模型输出字符串中提取推理内容。
 
-            Used for non-streaming responses where we have the entire model response
-            available before sending to the client.
+            用于非流式响应，即在返回给客户端前，已经拿到完整的模型输出。
 
-            Parameters:
+            参数说明：
             model_output: str
-                The model-generated string to extract reasoning content from.
+                需要提取推理内容的模型输出字符串
 
             request: ChatCompletionRequest
-                The request object that was used to generate the model_output.
+                生成该输出时用的请求对象
 
-            Returns:
+            返回值:
             tuple[Optional[str], Optional[str]]
-                A tuple containing the reasoning content and the content.
+                返回推理内容和最终内容的二元组
             """
     ```
 
-Additionally, to enable structured output, you'll need to create a new `Reasoner` similar to the one in [vllm/reasoning/deepseek_r1_reasoning_parser.py](../../vllm/reasoning/deepseek_r1_reasoning_parser.py).
+如果需要支持结构化输出，还需新增一个 `Reasoner`，可参考 [vllm/reasoning/deepseek_r1_reasoning_parser.py](../../vllm/reasoning/deepseek_r1_reasoning_parser.py) 的实现。
 
 ??? code
 
@@ -273,7 +266,7 @@ Additionally, to enable structured output, you'll need to create a new `Reasoner
     @dataclass
     class DeepSeekReasoner(Reasoner):
         """
-        Reasoner for DeepSeek R series models.
+        DeepSeek R 系列模型的推理器。
         """
         start_token_id: int
         end_token_id: int
@@ -293,9 +286,9 @@ Additionally, to enable structured output, you'll need to create a new `Reasoner
         ...
     ```
 
-The structured output engine like [xgrammar](https://github.com/mlc-ai/xgrammar) will use `end_token_id` to check if the reasoning content is present in the model output and skip the structured output if it is the case.
+像 [xgrammar](https://github.com/mlc-ai/xgrammar) 这样的结构化输出引擎会通过 `end_token_id` 判断模型输出中是否包含推理内容，并在需要时跳过结构化输出。
 
-Finally, you can enable reasoning for the model by using the `--reasoning-parser` flags.
+最后，通过 `--reasoning-parser` 参数即可为模型启用推理功能：
 
 ```bash
 vllm serve <model_tag> --reasoning-parser example

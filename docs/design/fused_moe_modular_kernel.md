@@ -1,40 +1,40 @@
-# Fused MoE Modular Kernel
+# Fused MoE 模块化内核
 
-## Introduction
+## 简介
 
-FusedMoEModularKernel is implemented [here](../..//vllm/model_executor/layers/fused_moe/modular_kernel.py)
+FusedMoEModularKernel 的实现详见 [此处](../..//vllm/model_executor/layers/fused_moe/modular_kernel.py)
 
-Based on the format of the input activations, FusedMoE implementations are broadly classified into 2 types.
+根据输入激活（activation）的格式，FusedMoE 的实现大致可以分为两类：
 
-* Contiguous / Standard / Non-Batched, and
-* Batched
-
-!!! note
-    The terms Contiguous, Standard, and Non-Batched are used interchangeably throughout the document.
-
-The input activation format completely depends on the All2All Dispatch being used.
-
-* In the Contiguous variant, the All2All Dispatch returns the activations as a contiguous tensor of shape (M, K) along with TopK Ids and TopK weights of shape (M, num_topk). Look at `DeepEPHTPrepareAndFinalize` for an example.
-* In the Batched variant, the All2All Dispatch returns the activations as a tensor of shape (num_experts, max_tokens, K). Here, the activations/tokens that subscribe to the same expert are batched together. Note that not all entries of the tensor are valid. The activations tensor is typically accompanied by an `expert_num_tokens` tensor of size `num_experts`, where `expert_num_tokens[i]` indicates the number of valid tokens that subscribe to the ith expert. Look at `PplxPrepareAndFinalize` or `DeepEPLLPrepareAndFinalize` for an example.
-
-The FusedMoE operation is generally made of multiple operations, in both the Contiguous and Batched variants, as described in the diagrams below
-
-![](../assets/design/fused_moe_modular_kernel/fused_moe_non_batched.png "FusedMoE Non-Batched")
-
-![](../assets/design/fused_moe_modular_kernel/fused_moe_batched.png "FusedMoE Batched")
+* 连续 / 标准 / 非批处理（Non-Batched）
+* 批处理（Batched）
 
 !!! note
-    The main difference, in terms of operations, between the Batched and Non-Batched cases is the Permute / Unpermute operations. All other operations remain.
+    文档中“连续”、“标准”和“非批处理”这几个术语是可以互换使用的。
 
-## Motivation
+输入激活的格式完全取决于所用的 All2All Dispatch。
 
-As can be seen from the diagrams, there are a lot of operations and there can be a variety of implementations for each operation. The set of ways the operations can be put together to make a valid FusedMoE implementation quickly becomes intractable. The Modular Kernel framework addresses this issue,  by grouping the operations into logical components. This broad categorization makes the combinations manageable and prevents code-duplication. This also decouples the All2All Dispatch & Combine implementations from the FusedMoE implementations and allows for their independent development and testing. Furthermore, the Modular Kernel framework introduces Abstract classes for the different components thus providing a well-defined skeleton for future implementations.
+* 连续模式下，All2All Dispatch 会返回一个形状为 (M, K) 的连续张量，以及形状为 (M, num_topk) 的 TopK Ids 和 TopK 权重。可以参考 `DeepEPHTPrepareAndFinalize` 的实现。
+* 批处理模式下，All2All Dispatch 返回的激活张量形状为 (num_experts, max_tokens, K)。此时，属于同一个专家（expert）的激活/Token 会被聚集在一起。注意，并不是这个张量中的所有元素都是有效的。通常还会有一个 `expert_num_tokens` 张量，大小为 `num_experts`，其中 `expert_num_tokens[i]` 表示第 i 个专家实际包含的有效 token 数量。可以参考 `PplxPrepareAndFinalize` 或 `DeepEPLLPrepareAndFinalize` 的实现。
 
-The rest of the document will focus on the Contiguous / Non-Batched case. Extrapolating to the Batched case should be straight-forward.
+无论是连续还是批处理模式，FusedMoE 操作一般都包含多个步骤，下面的流程图对此进行了说明：
 
-## ModularKernel Components
+![](../assets/design/fused_moe_modular_kernel/fused_moe_non_batched.png "FusedMoE 非批处理")
 
-FusedMoEModularKernel splits the FusedMoE operation into 3 parts,
+![](../assets/design/fused_moe_modular_kernel/fused_moe_batched.png "FusedMoE 批处理")
+
+!!! note
+    批处理与非批处理在操作上的主要区别在于 Permute / Unpermute（置换/还原）操作，其余步骤基本一致。
+
+## 设计动机
+
+从上面的流程图可以看出，FusedMoE 涉及的操作非常多，并且每一步都可能有多种实现方式。不同操作组合起来，FusedMoE 的实现方式会迅速变得复杂难以管理。模块化内核框架正是为了解决这个问题，它将各个操作归纳为逻辑组件。这样的分类既便于管理，也能避免代码重复。同时，模块化内核将 All2All 的 Dispatch（分发）和 Combine（合并）实现与 FusedMoE 的实现解耦，可以分别独立开发和测试。此外，模块化内核还为各个组件引入了抽象类，为后续扩展提供了清晰的骨架。
+
+后续文档将主要介绍连续 / 非批处理场景。扩展到批处理场景会很直接。
+
+## 模块化内核组件
+
+FusedMoEModularKernel 将 FusedMoE 操作拆分为三部分：
 
 1. TopKWeightAndReduce
 2. FusedMoEPrepareAndFinalize
@@ -42,26 +42,26 @@ FusedMoEModularKernel splits the FusedMoE operation into 3 parts,
 
 ### TopKWeightAndReduce
 
-The TopK Weight Application and Reduction components happen right after the Unpermute operation and before the All2All Combine. Note that the `FusedMoEPermuteExpertsUnpermute` is responsible for the Unpermute and `FusedMoEPrepareAndFinalize` is responsible for the All2All Combine. There is value in doing the TopK Weight Application and Reduction in the `FusedMoEPermuteExpertsUnpermute`. But some implementations choose to do it `FusedMoEPrepareAndFinalize`. In order to enable this flexibility, we have a TopKWeightAndReduce abstract class.
+TopK 权重应用和归约（Reduce）步骤紧跟在 Unpermute 操作之后，All2All Combine 之前。需要注意的是，`FusedMoEPermuteExpertsUnpermute` 负责 Unpermute，`FusedMoEPrepareAndFinalize` 负责 All2All Combine。将 TopK 权重应用和归约放在 `FusedMoEPermuteExpertsUnpermute` 内是有意义的，但有些实现选择在 `FusedMoEPrepareAndFinalize` 环节进行。为了实现灵活配置，我们设计了 TopKWeightAndReduce 抽象类。
 
-Please find the implementations of TopKWeightAndReduce [here](../../vllm/model_executor/layers/fused_moe/topk_weight_and_reduce.py).
+TopKWeightAndReduce 的具体实现见 [此处](../../vllm/model_executor/layers/fused_moe/topk_weight_and_reduce.py)。
 
-`FusedMoEPrepareAndFinalize::finalize()` method accepts a `TopKWeightAndReduce` argument that is invoked inside the method.
-The `FusedMoEModularKernel` acts as a bridge between the `FusedMoEPermuteExpertsUnpermute` and `FusedMoEPerpareAndFinalize` implementations to determine where the TopK Weight Application and Reduction happens.
+`FusedMoEPrepareAndFinalize::finalize()` 方法接受一个 `TopKWeightAndReduce` 参数，在方法内部进行调用。
+`FusedMoEModularKernel` 充当了 `FusedMoEPermuteExpertsUnpermute` 与 `FusedMoEPrepareAndFinalize` 的桥梁，决定 TopK 权重应用和归约的具体执行位置。
 
-* `FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl` method returns `TopKWeightAndReduceNoOp` if the `FusedMoEPermuteExpertsUnpermute` implementation does the weight application and reduction itself.
-* `FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl` method returns `TopKWeightAndReduceContiguous` / `TopKWeightAndReduceNaiveBatched` / `TopKWeightAndReduceDelegate` if the `FusedMoEPermuteExpertsUnpermute` implementation needs the `FusedMoEPrepareAndFinalize::finalize()` to do the weight application and reduction.
+* 如果 `FusedMoEPermuteExpertsUnpermute` 实现本身包含权重应用和归约逻辑，则 `FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl` 方法返回 `TopKWeightAndReduceNoOp`。
+* 如果需要在 `FusedMoEPrepareAndFinalize::finalize()` 执行权重应用和归约，则 `FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl` 方法会返回 `TopKWeightAndReduceContiguous` / `TopKWeightAndReduceNaiveBatched` / `TopKWeightAndReduceDelegate`。
 
 ### FusedMoEPrepareAndFinalize
 
-The `FusedMoEPrepareAndFinalize` abstract class exposes `prepare`, `prepare_no_receive`  and `finalize` functions.
-The `prepare` function is responsible for input activation Quantization and All2All Dispatch. If implemented, The `prepare_no_receive` is like `prepare` except it does not wait to receive results from other workers.  Instead it returns a "receiver" callback that must be invoked to wait for the final results of worker. It is not required that this method is supported by all `FusedMoEPrepareAndFinalize` classes, but if it is available, it can be used to interleave work with the initial all to all communication, e.g. interleaving shared experts with fused experts.  The `finalize` function is responsible for invoking the All2All Combine. Additionally the `finalize` function may or may not do the TopK weight application and reduction (Please refer to the TopKWeightAndReduce section)
+`FusedMoEPrepareAndFinalize` 抽象类提供了 `prepare`、`prepare_no_receive` 和 `finalize` 方法。
+`prepare` 负责输入激活的量化（Quantization）和 All2All 分发。`prepare_no_receive`（如果实现了）与 `prepare` 类似，不同的是它不会等待来自其他 worker 的结果，而是返回一个“receiver”回调，后续需要调用该回调以获得最终结果。不是所有 `FusedMoEPrepareAndFinalize` 类都必须实现该方法，如果实现了，可以用于和初始 All2All 通信过程并行处理其他工作，比如将共享专家和 Fused 专家交错处理。`finalize` 负责 All2All 合并，同时也可能包含 TopK 权重应用和归约（具体可参考 TopKWeightAndReduce 部分）。
 
-![](../assets/design/fused_moe_modular_kernel/prepare_and_finalize_blocks.png "FusedMoEPrepareAndFinalize Blocks")
+![](../assets/design/fused_moe_modular_kernel/prepare_and_finalize_blocks.png "FusedMoEPrepareAndFinalize 组件示意图")
 
 ### FusedMoEPermuteExpertsUnpermute
 
-The `FusedMoEPermuteExpertsUnpermute` class is where the crux of the MoE operations happen. The `FusedMoEPermuteExpertsUnpermute` abstract class exposes a few important functions,
+`FusedMoEPermuteExpertsUnpermute` 类是 MoE 操作的核心。该抽象类主要包括以下几个方法：
 
 * apply()
 * workspace_shapes()
@@ -69,31 +69,31 @@ The `FusedMoEPermuteExpertsUnpermute` class is where the crux of the MoE operati
 
 #### apply()
 
-The `apply` method is where the implementations perform
+apply 方法主要实现以下操作：
 
-* Permute
-* Matmul with weight W1
-* Act + Mul
-* Quantization
-* Matmul with weight W2
-* Unpermute
-* Maybe TopK Weight Application + Reduction
+* Permute（置换）
+* 与权重 W1 做矩阵乘法（Matmul）
+* 激活函数 + 乘法
+* 量化（Quantization）
+* 与权重 W2 做矩阵乘法（Matmul）
+* Unpermute（还原）
+* 可选：TopK 权重应用及归约
 
 #### workspace_shapes()
 
-The core FusedMoE implementation performs a series of operations. It would be inefficient to create output memory for each of these operations separately. To that effect, implementations are required to declare 2 workspace shapes, the workspace datatype and the FusedMoE output shape as outputs of the workspace_shapes() method. This information is used to allocate the workspace tensors and the output tensor in `FusedMoEModularKernel::forward()` and passed on to the `FusedMoEPermuteExpertsUnpermute::apply()` method. The workspaces could then be used as intermediate buffers in the FusedMoE implementation.
+FusedMoE 的核心实现会执行一系列操作。如果每步都单独为输出分配内存会造成效率低下。因此各个实现需要通过 workspace_shapes() 方法声明两个工作区的形状：工作区数据类型，以及 FusedMoE 输出的形状。`FusedMoEModularKernel::forward()` 方法会用这些信息分配工作区张量和输出张量，并将其传递给 `FusedMoEPermuteExpertsUnpermute::apply()` 方法。工作区可以作为中间缓冲区使用。
 
 #### finalize_weight_and_reduce_impl()
 
-It is sometimes efficient to perform TopK weight application and Reduction inside the `FusedMoEPermuteExpertsUnpermute::apply()`. Find an example [here](https://github.com/vllm-project/vllm/pull/20228). We have a `TopKWeightAndReduce` abstract class to facilitate such implementations. Please refer to the TopKWeightAndReduce section.
-`FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl()` returns the `TopKWeightAndReduce` object that the implementation wants the `FusedMoEPrepareAndFinalize::finalize()` to use.
+有时候，在 `FusedMoEPermuteExpertsUnpermute::apply()` 内部直接进行 TopK 权重应用和归约会更高效。可以参考 [这个例子](https://github.com/vllm-project/vllm/pull/20228)。我们提供了 TopKWeightAndReduce 抽象类以支持这种实现方式，详见 TopKWeightAndReduce 部分。
+`FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl()` 会返回一个 TopKWeightAndReduce 对象，供 `FusedMoEPrepareAndFinalize::finalize()` 使用。
 
-![](../assets/design/fused_moe_modular_kernel/fused_experts_blocks.png "FusedMoEPermuteExpertsUnpermute Blocks")
+![](../assets/design/fused_moe_modular_kernel/fused_experts_blocks.png "FusedMoEPermuteExpertsUnpermute 组件示意图")
 
 ### FusedMoEModularKernel
 
-`FusedMoEModularKernel` is composed of the `FusedMoEPrepareAndFinalize` and `FusedMoEPermuteExpertsUnpermute` objects.
-`FusedMoEModularKernel` pseudocode/sketch,
+`FusedMoEModularKernel` 由 `FusedMoEPrepareAndFinalize` 和 `FusedMoEPermuteExpertsUnpermute` 两个对象组成。
+伪代码如下：
 
 ```py
 class FusedMoEModularKernel:
@@ -110,15 +110,14 @@ class FusedMoEModularKernel:
 
         workspace13_shape, workspace2_shape, _, _ = self.fused_experts.workspace_shapes(...)
 
-        # allocate workspaces
+        # 分配工作区
         workspace_13 = torch.empty(workspace13_shape, ...)
         workspace_2 = torch.empty(workspace2_shape, ...)
 
-        # execute fused_experts
+        # 执行 fused_experts 操作
         fe_out = self.fused_experts.apply(Aq, A_scale, workspace13, workspace2, ...)
 
-        # war_impl is an object of type TopKWeightAndReduceNoOp if the fused_experts implementations
-        # performs the TopK Weight Application and Reduction.
+        # 若 fused_experts 的实现已完成 TopK 权重应用和归约，则 war_impl 类型为 TopKWeightAndReduceNoOp
         war_impl = self.fused_experts.finalize_weight_and_reduce_impl()
 
         output = self.prepare_finalize.finalize(fe_out, war_impl,...)
@@ -126,124 +125,112 @@ class FusedMoEModularKernel:
         return output
 ```
 
-## How-To
+## 实践指南
 
-### How To Add a FusedMoEPrepareAndFinalize Type
+### 如何新增 FusedMoEPrepareAndFinalize 类型
 
-Typically a FusedMoEPrepareAndFinalize type is backed by an All2All Dispatch & Combine implementation / kernel. For example,
+一般来说，FusedMoEPrepareAndFinalize 类型是由某个 All2All 分发与合并的实现/内核作为底层支撑。例如：
 
-* PplxPrepareAndFinalize type is backed by Pplx All2All kernels,
-* DeepEPHTPrepareAndFinalize type is backed by DeepEP High-Throughput All2All kernels, and
-* DeepEPLLPrepareAndFinalize type is backed by DeepEP Low-Latency All2All kernels.
+* PplxPrepareAndFinalize 类型对应 Pplx All2All 内核，
+* DeepEPHTPrepareAndFinalize 类型对应 DeepEP 高吞吐量 All2All 内核，
+* DeepEPLLPrepareAndFinalize 类型对应 DeepEP 低延迟 All2All 内核。
 
-#### Step 1: Add an All2All manager
+#### 步骤 1：添加 All2All 管理器
 
-The purpose of the All2All Manager is to set up the All2All kernel implementations. The `FusedMoEPrepareAndFinalize` implementations typically fetch a kernel-implementation "handle" from the All2All Manager to invoke the Dispatch and Combine functions. Please look at the All2All Manager implementations [here](../../vllm/distributed/device_communicators/all2all.py).
+All2All 管理器的作用是配置 All2All 内核实现。通常 `FusedMoEPrepareAndFinalize` 的实现会从 All2All 管理器获取内核实现的“句柄”，用于调用分发和合并方法。相关实现可参考 [此处](../../vllm/distributed/device_communicators/all2all.py)。
 
-#### Step 2: Add a FusedMoEPrepareAndFinalize Type
+#### 步骤 2：添加 FusedMoEPrepareAndFinalize 类型
 
-This section describes the significance of the various functions exposed by the `FusedMoEPrepareAndFinalize` abstract class.
+本节说明 `FusedMoEPrepareAndFinalize` 抽象类中各方法的意义。
 
-`FusedMoEPrepareAndFinalize::prepare()`: The prepare method implements the Quantization and All2All Dispatch. Typically the Dispatch function from the relevant All2All Manager is invoked.
+`FusedMoEPrepareAndFinalize::prepare()`：实现量化和 All2All 分发。通常调用对应 All2All 管理器的分发方法。
 
-`FusedMoEPrepareAndFinalize::has_prepare_no_receive()`: Indicates whether or not this subclass implements `prepare_no_receive`. Defaults to False.
+`FusedMoEPrepareAndFinalize::has_prepare_no_receive()`：指示是否实现了 `prepare_no_receive`。默认为 False。
 
-`FusedMoEPrepareAndFinalize::prepare_no_receive()`: The prepare_no_receive method implements the Quantization and All2All Dispatch. It does not wait for the result of the dispatch operation but instead returns a thunk that can be invoked to wait for the final results. Typically the Dispatch function from the relevant All2All Manager is invoked.
+`FusedMoEPrepareAndFinalize::prepare_no_receive()`：实现量化和 All2All 分发，但不会等待结果，而是返回一个 thunk（可调用对象），后续手动等待最终结果。一般调用对应 All2All 管理器的分发方法。
 
-`FusedMoEPrepareAndFinalize::finalize()`: Maybe perform TopK Weight Application and Reduction and All2All Combine. Typically the Combine function from the relevant All2AllManager is invoked.
+`FusedMoEPrepareAndFinalize::finalize()`：可能包含 TopK 权重应用和归约，以及 All2All 合并。通常调用对应 All2All 管理器的合并方法。
 
-`FusedMoEPrepareAndFinalize::activation_format()`: Return `FusedMoEActivationFormat.BatchedExperts` if the output of the prepare method (i.e. the All2All dispatch) is Batched. Return `FusedMoEActivationFormat.Standard` otherwise.
+`FusedMoEPrepareAndFinalize::activation_format()`：如果 prepare 方法（即 All2All 分发）的输出是批处理，则返回 `FusedMoEActivationFormat.BatchedExperts`，否则返回 `FusedMoEActivationFormat.Standard`。
 
-`FusedMoEPrepareAndFinalize::topk_indices_dtype()`: Data type of the TopK ids. Some All2All kernels have strict requirements pertaining to the data type of the TopK ids. This requirement is passed on to the `FusedMoe::select_experts` function so it could be respected. If there are no strict requirements return None.
+`FusedMoEPrepareAndFinalize::topk_indices_dtype()`：TopK Ids 的数据类型。有些 All2All 内核对 TopK Ids 的数据类型有严格要求，会将该要求传递给 `FusedMoe::select_experts` 方法。如果没有特殊要求则返回 None。
 
-`FusedMoEPrepareAndFinalize::max_num_tokens_per_rank()`: This is the maximum number of tokens that would be submitted to the All2All Dispatch at once.
+`FusedMoEPrepareAndFinalize::max_num_tokens_per_rank()`：All2All 分发一次最多处理的 token 数量。
 
-`FusedMoEPrepareAndFinalize::num_dispatchers()`: Total number of dispatching units. This value determines the size of the Dispatch output. The Dispatch output is of shape (num_local_experts, max_num_tokens, K). Here max_num_tokens = num_dispatchers() * max_num_tokens_per_rank().
+`FusedMoEPrepareAndFinalize::num_dispatchers()`：分发单元总数。该值决定了分发输出的形状，输出形状为 (num_local_experts, max_num_tokens, K)，其中 max_num_tokens = num_dispatchers() * max_num_tokens_per_rank()。
 
-We suggest picking an already existing `FusedMoEPrepareAndFinalize` implementation that matches your All2All implementation closely and using it as a reference.
+建议参考已有的 `FusedMoEPrepareAndFinalize` 实现，选择和你的 All2All 实现最接近的版本作为模板。
 
-### How To Add a FusedMoEPermuteExpertsUnpermute Type
+### 如何新增 FusedMoEPermuteExpertsUnpermute 类型
 
-FusedMoEPermuteExpertsUnpermute performs the core of the FusedMoE operations. The various functions exposed by the abstract class and their significance is as follows,
+FusedMoEPermuteExpertsUnpermute 实现了 FusedMoE 的核心操作。其抽象类方法及意义如下：
 
-`FusedMoEPermuteExpertsUnpermute::activation_formats()`: Return the supported Input and Output activation formats. i.e. Contiguous / Batched format.
+`FusedMoEPermuteExpertsUnpermute::activation_formats()`：返回支持的输入与输出激活格式（连续/批处理）。
 
-`FusedMoEPermuteExpertsUnpermute::supports_chunking()`: Return True if the implementation supports chunking. Typically
-implementations that input `FusedMoEActivationFormat.Standard` support chunking and `FusedMoEActivationFormat.BatchedExperts` do not.
+`FusedMoEPermuteExpertsUnpermute::supports_chunking()`：如果实现支持 chunking（分块处理），返回 True。一般输入为 `FusedMoEActivationFormat.Standard` 支持 chunking，`FusedMoEActivationFormat.BatchedExperts` 不支持。
 
-`FusedMoEPermuteExpertsUnpermute::supports_expert_map()`: Return True if the implementation supports expert map.
+`FusedMoEPermuteExpertsUnpermute::supports_expert_map()`：是否支持专家映射。
 
 `FusedMoEPermuteExpertsUnpermute::workspace_shapes()` /
 `FusedMoEPermuteExpertsUnpermute::finalize_weight_and_reduce_impl` /
-`FusedMoEPermuteExpertsUnpermute::apply`: Refer to `FusedMoEPermuteExpertsUnpermute` section above.
+`FusedMoEPermuteExpertsUnpermute::apply`：详见上方 “FusedMoEPermuteExpertsUnpermute” 部分。
 
-### FusedMoEModularKernel Initialization
+### FusedMoEModularKernel 初始化流程
 
-`FusedMoEMethodBase` class has 3 methods that are collectively responsible in creating the `FusedMoEModularKernel` object. They are,
+`FusedMoEMethodBase` 类有三个方法共同负责创建 `FusedMoEModularKernel` 对象：
 
-* maybe_make_prepare_finalize,
-* select_gemm_impl, and
+* maybe_make_prepare_finalize
+* select_gemm_impl
 * init_prepare_finalize
 
 #### maybe_make_prepare_finalize
 
-The `maybe_make_prepare_finalize` method is responsible for constructing an instance of `FusedMoEPrepareAndFinalize` when appropriate based on the current all2all backend, e.g. when EP + DP is enabled.  The base class method currently constructs all the `FusedMoEPrepareAndFinalize` objects for the EP+DP case.  Derived classes can override this method to construct prepare/finalize objects for different scenarios, e.g. `ModelOptNvFp4FusedMoE` can construct a `FlashInferCutlassMoEPrepareAndFinalize` for the EP+TP case.
-Please refer to the implementations in,
+该方法负责根据当前 all2all 后端的配置，构造合适的 `FusedMoEPrepareAndFinalize` 实例，比如在 EP + DP 场景启用时。基类方法目前会为 EP+DP 场景构造所有相关的 `FusedMoEPrepareAndFinalize` 对象。子类可以重写该方法以适配更多场景，比如 `ModelOptNvFp4FusedMoE` 可以为 EP+TP 场景构造 `FlashInferCutlassMoEPrepareAndFinalize`。
+参考实现：
 
 * `ModelOptNvFp4FusedMoE`
 
 #### select_gemm_impl
 
-The `select_gemm_impl` method is undefined in the base class. It is the responsibility of the derived class to implement a method that constructs a valid/appropriate `FusedMoEPermuteExpertsUnpermute` object.
-Please refer to the implementations in,
+该方法在基类中未定义，由子类负责实现，用于构造合适的 `FusedMoEPermuteExpertsUnpermute` 对象。
+参考实现：
 
 * `UnquantizedFusedMoEMethod`
 * `CompressedTensorsW8A8Fp8MoEMethod`
 * `CompressedTensorsW8A8Fp8MoECutlassMethod`
 * `Fp8MoEMethod`
 * `ModelOptNvFp4FusedMoE`
-derived classes.
+等子类。
 
 #### init_prepare_finalize
 
-Based on the input and env settings, the `init_prepare_finalize` method creates the appropriate `FusedMoEPrepareAndFinalize` object. The method then queries `select_gemm_impl` for the appropriate `FusedMoEPermuteExpertsUnpermute` object and builds the `FusedMoEModularKernel` object
+该方法根据输入和环境变量，创建合适的 `FusedMoEPrepareAndFinalize` 对象。然后调用 `select_gemm_impl` 获取合适的 `FusedMoEPermuteExpertsUnpermute` 对象，最终构建出 `FusedMoEModularKernel` 对象。
 
-Please take a look at [init_prepare_finalize](https://github.com/vllm-project/vllm/blob/1cbf951ba272c230823b947631065b826409fa62/vllm/model_executor/layers/fused_moe/layer.py#L188).
-**Important**: The `FusedMoEMethodBase` derived classes use the `FusedMoEMethodBase::fused_experts` object in their `apply` methods. When settings permit the construction of a valid `FusedMoEModularKernel` object, we override `FusedMoEMethodBase::fused_experts` with it. This essentially makes the derived classes agnostic to what FusedMoE implementation is used.
+请参考 [init_prepare_finalize](https://github.com/vllm-project/vllm/blob/1cbf951ba272c230823b947631065b826409fa62/vllm/model_executor/layers/fused_moe/layer.py#L188)。
+**重要说明**：`FusedMoEMethodBase` 的子类会在其 `apply` 方法中使用 `FusedMoEMethodBase::fused_experts` 对象。当环境允许构造有效的 `FusedMoEModularKernel` 对象时，会用该对象覆盖 `FusedMoEMethodBase::fused_experts`，从而让子类无需关心具体采用哪种 FusedMoE 实现。
 
-### How To Unit Test
+### 单元测试指南
 
-We have `FusedMoEModularKernel` unit tests at [test_modular_kernel_combinations.py](../../tests/kernels/moe/test_modular_kernel_combinations.py).
+我们为 `FusedMoEModularKernel` 提供了单元测试，详见 [test_modular_kernel_combinations.py](../../tests/kernels/moe/test_modular_kernel_combinations.py)。
 
-The unit test iterates through all combinations of `FusedMoEPrepareAndFinalize` and `FusedMoEPremuteExpertsUnpermute` types and if they are
-compatible, runs some correctness tests.
-If you are adding some `FusedMoEPrepareAndFinalize` / `FusedMoEPermuteExpertsUnpermute` implementations,
+测试会遍历所有 `FusedMoEPrepareAndFinalize` 和 `FusedMoEPremuteExpertsUnpermute` 类型的组合，如果兼容就会运行正确性测试。
+如果你要添加新的 `FusedMoEPrepareAndFinalize` 或 `FusedMoEPermuteExpertsUnpermute` 实现：
 
-1. Add the implementation type to `MK_ALL_PREPARE_FINALIZE_TYPES` and `MK_FUSED_EXPERT_TYPES` in [mk_objects.py](../../tests/kernels/moe/modular_kernel_tools/mk_objects.py) respectively.
-2. Update `Config::is_batched_prepare_finalize()`, `Config::is_batched_fused_experts()`, `Config::is_standard_fused_experts()`,
-`Config::is_fe_16bit_supported()`,  `Config::is_fe_fp8_supported()`, `Config::is_fe_block_fp8_supported()`,
-`Config::is_fe_supports_chunking()` methods in [/tests/kernels/moe/modular_kernel_tools/common.py](../../tests/kernels/moe/modular_kernel_tools/common.py)
+1. 在 [mk_objects.py](../../tests/kernels/moe/modular_kernel_tools/mk_objects.py) 中分别将新类型加入 `MK_ALL_PREPARE_FINALIZE_TYPES` 和 `MK_FUSED_EXPERT_TYPES`。
+2. 在 [/tests/kernels/moe/modular_kernel_tools/common.py](../../tests/kernels/moe/modular_kernel_tools/common.py) 中更新 `Config::is_batched_prepare_finalize()`、`Config::is_batched_fused_experts()`、`Config::is_standard_fused_experts()`、`Config::is_fe_16bit_supported()`、`Config::is_fe_fp8_supported()`、`Config::is_fe_block_fp8_supported()`、`Config::is_fe_supports_chunking()` 方法。
 
-Doing this will add the new implementation to the test suite.
+按上述操作即可将新实现加入测试集。
 
-### How To Check `FusedMoEPrepareAndFinalize` & `FusedMoEPermuteExpertsUnpermute` Compatibility
+### 如何检查 FusedMoEPrepareAndFinalize 与 FusedMoEPermuteExpertsUnpermute 的兼容性
 
-The unit test file [test_modular_kernel_combinations.py](../../tests/kernels/moe/test_modular_kernel_combinations.py) can also be executed as a standalone script.
-Example: `python3 -m tests.kernels.moe.test_modular_kernel_combinations --pf-type PplxPrepareAndFinalize --experts-type BatchedTritonExperts`
-As a side effect, this script can be used to test `FusedMoEPrepareAndFinalize` & `FusedMoEPermuteExpertsUnpermute` compatibility. When invoked
-with incompatible types, the script will error.
+单元测试文件 [test_modular_kernel_combinations.py](../../tests/kernels/moe/test_modular_kernel_combinations.py) 可以作为独立脚本执行。
+例如：`python3 -m tests.kernels.moe.test_modular_kernel_combinations --pf-type PplxPrepareAndFinalize --experts-type BatchedTritonExperts`
+这样可以检测两种类型的兼容性。如果类型不兼容，脚本会报错。
 
-### How To Profile
+### 如何性能分析（Profile）
 
-Please take a look at [profile_modular_kernel.py](../../tests/kernels/moe/modular_kernel_tools/profile_modular_kernel.py)
-The script can be used to generate Torch traces for a single `FusedMoEModularKernel::forward()` call for any compatible
-`FusedMoEPrepareAndFinalize` and `FusedMoEPermuteExpertsUnpermute` types.
-Example: `python3 -m tests.kernels.moe.modular_kernel_tools.profile_modular_kernel --pf-type PplxPrepareAndFinalize --experts-type BatchedTritonExperts`
+可参考 [profile_modular_kernel.py](../../tests/kernels/moe/modular_kernel_tools/profile_modular_kernel.py)
+该脚本可为任意兼容的 `FusedMoEModularKernel::forward()` 调用生成 Torch trace。
+例如：`python3 -m tests.kernels.moe.modular_kernel_tools.profile_modular_kernel --pf-type PplxPrepareAndFinalize --experts-type BatchedTritonExperts`
 
-## FusedMoEPrepareAndFinalize Implementations
-
-See [Fused MoE Kernel features](./moe_kernel_features.md#fused-moe-modular-all2all-backends) for a list of all the available modular prepare and finalize subclasses.
-
-## FusedMoEPermuteExpertsUnpermute
-
-See [Fused MoE Kernel features](./moe_kernel_features.md#fused-moe-experts-kernels) for a list of all the available modular experts.
+## FusedMoEPrepareAndFinalize

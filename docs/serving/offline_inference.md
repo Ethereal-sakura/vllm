@@ -1,42 +1,42 @@
-# Offline Inference
+# 离线推理
 
-Offline inference is possible in your own code using vLLM's [`LLM`][vllm.LLM] class.
+你可以在自己的代码中使用 vLLM 的 [`LLM`][vllm.LLM] 类进行离线推理。
 
-For example, the following code downloads the [`facebook/opt-125m`](https://huggingface.co/facebook/opt-125m) model from HuggingFace
-and runs it in vLLM using the default configuration.
+比如，下面的代码会从 HuggingFace 下载 [`facebook/opt-125m`](https://huggingface.co/facebook/opt-125m) 模型，
+并用默认配置在 vLLM 中运行该模型。
 
 ```python
 from vllm import LLM
 
-# Initialize the vLLM engine.
+# 初始化 vLLM 引擎
 llm = LLM(model="facebook/opt-125m")
 ```
 
-After initializing the `LLM` instance, use the available APIs to perform model inference.
-The available APIs depend on the model type:
+初始化 `LLM` 实例后，可以通过相关 API 执行模型推理。
+具体可用的 API 取决于模型类型：
 
-- [Generative models](../models/generative_models.md) output logprobs which are sampled from to obtain the final output text.
-- [Pooling models](../models/pooling_models.md) output their hidden states directly.
+- [生成式模型](../models/generative_models.md) 会输出 logprobs，最终的文本结果由这些概率采样得到。
+- [池化模型](../models/pooling_models.md) 会直接输出它们的隐藏状态。
 
 !!! info
-    [API Reference](../api/README.md#offline-inference)
+    [API 参考](../api/README.md#offline-inference)
 
 ## Ray Data LLM API
 
-Ray Data LLM is an alternative offline inference API that uses vLLM as the underlying engine.
-This API adds several batteries-included capabilities that simplify large-scale, GPU-efficient inference:
+Ray Data LLM 是一种替代的离线推理 API，底层同样使用 vLLM 引擎。
+这一 API 提供了多项开箱即用的功能，能够简化大规模、高效利用 GPU 的推理流程：
 
-- Streaming execution processes datasets that exceed aggregate cluster memory.
-- Automatic sharding, load balancing, and autoscaling distribute work across a Ray cluster with built-in fault tolerance.
-- Continuous batching keeps vLLM replicas saturated and maximizes GPU utilization.
-- Transparent support for tensor and pipeline parallelism enables efficient multi-GPU inference.
-- Reading and writing to most popular file formats and cloud object storage.
-- Scaling up the workload without code changes.
+- 流式执行可处理超出集群总内存的数据集。
+- 自动分片、负载均衡与自动扩容，工作任务分布在 Ray 集群中，支持容错。
+- 持续批处理让 vLLM 副本始终保持高效，最大化 GPU 利用率。
+- 支持张量并行和流水线并行，轻松实现多 GPU 高效推理。
+- 支持主流文件格式和云对象存储的读写操作。
+- 无需修改代码即可扩展工作负载规模。
 
 ??? code
 
     ```python
-    import ray  # Requires ray>=2.44.1
+    import ray  # 需要 ray>=2.44.1
     from ray.data.llm import vLLMEngineProcessorConfig, build_llm_processor
 
     config = vLLMEngineProcessorConfig(model_source="unsloth/Llama-3.2-1B-Instruct")
@@ -44,7 +44,7 @@ This API adds several batteries-included capabilities that simplify large-scale,
         config,
         preprocess=lambda row: {
             "messages": [
-                {"role": "system", "content": "You are a bot that completes unfinished haikus."},
+                {"role": "system", "content": "你是一个用诗句补全未完成俳句的机器人。"},
                 {"role": "user", "content": row["item"]},
             ],
             "sampling_params": {"temperature": 0.3, "max_tokens": 250},
@@ -57,4 +57,4 @@ This API adds several batteries-included capabilities that simplify large-scale,
     ds.write_parquet("local:///tmp/data/")
     ```
 
-For more information about the Ray Data LLM API, see the [Ray Data LLM documentation](https://docs.ray.io/en/latest/data/working-with-llms.html).
+关于 Ray Data LLM API 的更多信息，可参考 [Ray Data LLM 文档](https://docs.ray.io/en/latest/data/working-with-llms.html) 

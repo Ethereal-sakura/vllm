@@ -1,17 +1,17 @@
-# Installation
+# 安装指南
 
-## Requirements
+## 环境要求
 
-## Set up using Python
+## 使用 Python 安装
 
-### Pre-built wheels
+### 预编译 wheel 包
 
-### Build wheel from source
+### 从源代码构建 wheel 包
 
-## Set up using Docker
+## 使用 Docker 安装
 
-### Pre-built images
+### 预编译镜像
 
-### Build image from source
+### 从源代码构建镜像
 
-## Extra information
+## 其他信息

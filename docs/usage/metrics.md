@@ -1,18 +1,16 @@
-# Production Metrics
+# 生产环境指标
 
-vLLM exposes a number of metrics that can be used to monitor the health of the
-system. These metrics are exposed via the `/metrics` endpoint on the vLLM
-OpenAI compatible API server.
+vLLM 提供了多项指标，便于监控系统的健康状况。这些指标可以通过 vLLM OpenAI 兼容 API 服务器的 `/metrics` 接口获取。
 
-You can start the server using Python, or using [Docker](../deployment/docker.md):
+你可以使用 Python 启动服务器，或通过 [Docker](../deployment/docker.md) 启动：
 
 ```bash
 vllm serve unsloth/Llama-3.2-1B-Instruct
 ```
 
-Then query the endpoint to get the latest metrics from the server:
+然后通过查询该接口获取服务器的最新指标数据：
 
-??? console "Output"
+??? console "输出示例"
 
     ```console
     $ curl http://0.0.0.0:8000/metrics
@@ -31,7 +29,7 @@ Then query the endpoint to get the latest metrics from the server:
     ...
     ```
 
-The following metrics are exposed:
+目前开放的指标如下：
 
 ??? code
 
@@ -39,6 +37,4 @@ The following metrics are exposed:
     --8<-- "vllm/engine/metrics.py:metrics-definitions"
     ```
 
-Note: when metrics are deprecated in version `X.Y`, they are hidden in version `X.Y+1`
-but can be re-enabled using the `--show-hidden-metrics-for-version=X.Y` escape hatch,
-and are then removed in version `X.Y+2`.
+注意：当某个指标在 `X.Y` 版本被弃用时，会在 `X.Y+1` 版本中隐藏，但可以通过 `--show-hidden-metrics-for-version=X.Y` 参数重新显示，最终会在 `X.Y+2` 版本中彻底移除。

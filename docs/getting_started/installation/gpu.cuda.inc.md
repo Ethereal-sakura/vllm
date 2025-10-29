@@ -1,21 +1,21 @@
 # --8<-- [start:installation]
 
-vLLM contains pre-compiled C++ and CUDA (12.8) binaries.
+vLLM 内置了预编译好的 C++ 和 CUDA (12.8) 二进制文件。
 
 # --8<-- [end:installation]
 # --8<-- [start:requirements]
 
-- GPU: compute capability 7.0 or higher (e.g., V100, T4, RTX20xx, A100, L4, H100, etc.)
+- GPU：计算能力（compute capability）7.0及以上（如 V100、T4、RTX20xx、A100、L4、H100 等）
 
 # --8<-- [end:requirements]
 # --8<-- [start:set-up-using-python]
 
 !!! note
-    PyTorch installed via `conda` will statically link `NCCL` library, which can cause issues when vLLM tries to use `NCCL`. See <https://github.com/vllm-project/vllm/issues/8420> for more details.
+    通过 `conda` 安装的 PyTorch 会静态链接 `NCCL` 库，这可能导致 vLLM 在使用 `NCCL` 时出现问题。详细信息请参考 <https://github.com/vllm-project/vllm/issues/8420>
 
-In order to be performant, vLLM has to compile many cuda kernels. The compilation unfortunately introduces binary incompatibility with other CUDA versions and PyTorch versions, even for the same PyTorch version with different building configurations.
+为了获得最佳性能，vLLM 需要编译大量 cuda 内核。但这种编译过程会导致不同 CUDA 版本、PyTorch 版本之间出现二进制不兼容，即使是同一个 PyTorch 版本，不同的编译配置也可能不兼容。
 
-Therefore, it is recommended to install vLLM with a **fresh new** environment. If either you have a different CUDA version or you want to use an existing PyTorch installation, you need to build vLLM from source. See [below](#build-wheel-from-source) for more details.
+因此，建议在一个**全新环境**下安装 vLLM。如果你的 CUDA 版本不同，或者需要使用现有的 PyTorch 安装，必须从源码编译 vLLM。具体步骤请见[下文](#build-wheel-from-source)。
 
 # --8<-- [end:set-up-using-python]
 # --8<-- [start:pre-built-wheels]
@@ -26,27 +26,27 @@ uv pip install vllm --torch-backend=auto
 
 ??? console "pip"
     ```bash
-    # Install vLLM with CUDA 12.8.
+    # 使用 CUDA 12.8 安装 vLLM
     pip install vllm --extra-index-url https://download.pytorch.org/whl/cu128
     ```
 
-We recommend leveraging `uv` to [automatically select the appropriate PyTorch index at runtime](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection) by inspecting the installed CUDA driver version via `--torch-backend=auto` (or `UV_TORCH_BACKEND=auto`). To select a specific backend (e.g., `cu126`), set `--torch-backend=cu126` (or `UV_TORCH_BACKEND=cu126`). If this doesn't work, try running `uv self update` to update `uv` first.
+我们推荐使用 `uv`，它可以通过 `--torch-backend=auto`（或设置环境变量 `UV_TORCH_BACKEND=auto`），[自动检测已安装的 CUDA 驱动版本，在运行时选择匹配的 PyTorch 索引](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)。如果需要指定后端（比如 `cu126`），可以设置 `--torch-backend=cu126`（或环境变量 `UV_TORCH_BACKEND=cu126`）。如果遇到问题，先运行 `uv self update` 更新 `uv` 再试。
 
 !!! note
-    NVIDIA Blackwell GPUs (B200, GB200) require a minimum of CUDA 12.8, so make sure you are installing PyTorch wheels with at least that version. PyTorch itself offers a [dedicated interface](https://pytorch.org/get-started/locally/) to determine the appropriate pip command to run for a given target configuration.
+    NVIDIA Blackwell 系列 GPU（如 B200、GB200）至少需要 CUDA 12.8，因此安装 PyTorch 时请确保版本不低于 12.8。PyTorch 官方提供了[专用页面](https://pytorch.org/get-started/locally/)，可以根据你的目标配置查询合适的 pip 安装命令。
 
-As of now, vLLM's binaries are compiled with CUDA 12.8 and public PyTorch release versions by default. We also provide vLLM binaries compiled with CUDA 12.6, 11.8, and public PyTorch release versions:
+目前 vLLM 的二进制文件默认使用 CUDA 12.8 和 PyTorch 公共版本编译。我们也提供了用 CUDA 12.6、11.8 以及相应 PyTorch 公共版本编译的 vLLM 二进制：
 
 ```bash
-# Install vLLM with a specific CUDA version (e.g., 11.8 or 12.6).
+# 安装指定 CUDA 版本（如 11.8 或 12.6）的 vLLM
 export VLLM_VERSION=$(curl -s https://api.github.com/repos/vllm-project/vllm/releases/latest | jq -r .tag_name | sed 's/^v//')
-export CUDA_VERSION=118 # or 126
+export CUDA_VERSION=118 # 或 126
 uv pip install https://github.com/vllm-project/vllm/releases/download/v${VLLM_VERSION}/vllm-${VLLM_VERSION}+cu${CUDA_VERSION}-cp38-abi3-manylinux1_x86_64.whl --extra-index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
 ```
 
-#### Install the latest code
+#### 安装最新代码
 
-LLM inference is a fast-evolving field, and the latest code may contain bug fixes, performance improvements, and new features that are not released yet. To allow users to try the latest code without waiting for the next release, vLLM provides wheels for Linux running on an x86 platform with CUDA 12 for every commit since `v0.5.3`.
+LLM 推理领域发展非常快，最新代码可能包含尚未发布的修复、性能优化和新功能。为了让用户可以随时体验最新代码，无需等待下个版本发布，vLLM 每次提交都会为 x86 平台、CUDA 12 的 Linux 系统构建夜间版 wheel 包。
 
 ```bash
 uv pip install -U vllm \
@@ -61,45 +61,37 @@ uv pip install -U vllm \
         --extra-index-url https://wheels.vllm.ai/nightly
     ```
 
-    `--pre` is required for `pip` to consider pre-released versions.
+    使用 `pip` 时，需加 `--pre` 参数才能安装预发布版本。
 
-##### Install specific revisions
+##### 安装指定版本（commit）
 
-If you want to access the wheels for previous commits (e.g. to bisect the behavior change, performance regression), you can specify the commit hash in the URL:
+如果你需要获取历史提交的 wheel 包（比如定位行为变化或性能回退），可以在 URL 中指定 commit hash：
 
 ```bash
-export VLLM_COMMIT=72d9c316d3f6ede485146fe5aabd4e61dbc59069 # use full commit hash from the main branch
+export VLLM_COMMIT=72d9c316d3f6ede485146fe5aabd4e61dbc59069 # 使用主分支上的完整 commit hash
 uv pip install vllm \
     --torch-backend=auto \
     --extra-index-url https://wheels.vllm.ai/${VLLM_COMMIT}
 ```
 
-The `uv` approach works for vLLM `v0.6.6` and later and offers an easy-to-remember command. A unique feature of `uv` is that packages in `--extra-index-url` have [higher priority than the default index](https://docs.astral.sh/uv/pip/compatibility/#packages-that-exist-on-multiple-indexes). If the latest public release is `v0.6.6.post1`, `uv`'s behavior allows installing a commit before `v0.6.6.post1` by specifying the `--extra-index-url`. In contrast, `pip` combines packages from `--extra-index-url` and the default index, choosing only the latest version, which makes it difficult to install a development version prior to the released version.
+这种 `uv` 安装方式适用于 vLLM `v0.6.6` 及以后版本，命令简单易记。`uv` 的一个特点是，`--extra-index-url` 指定的索引优先级高于默认索引，[具体说明见官方文档](https://docs.astral.sh/uv/pip/compatibility/#packages-that-exist-on-multiple-indexes)。比如，若最新正式版为 `v0.6.6.post1`，通过指定 `--extra-index-url` 可以安装 `post1` 之前的 commit wheel。而 `pip` 会合并不同索引，只安装最新版本，所以不方便安装开发中的历史版本。
 
 ??? note "pip"
-    If you want to access the wheels for previous commits (e.g. to bisect the behavior change,
-    performance regression), due to the limitation of `pip`, you have to specify the full URL of the
-    wheel file by embedding the commit hash in the URL:
+    如果你想用 `pip` 安装历史提交的 wheel，需要在 URL 中直接嵌入 commit hash，指定完整 wheel 文件地址：
 
     ```bash
-    export VLLM_COMMIT=33f460b17a54acb3b6cc0b03f4a17876cff5eafd # use full commit hash from the main branch
+    export VLLM_COMMIT=33f460b17a54acb3b6cc0b03f4a17876cff5eafd # 使用主分支上的完整 commit hash
     pip install https://wheels.vllm.ai/${VLLM_COMMIT}/vllm-1.0.0.dev-cp38-abi3-manylinux1_x86_64.whl
     ```
 
-    Note that the wheels are built with Python 3.8 ABI (see [PEP
-    425](https://peps.python.org/pep-0425/) for more details about ABI), so **they are compatible
-    with Python 3.8 and later**. The version string in the wheel file name (`1.0.0.dev`) is just a
-    placeholder to have a unified URL for the wheels, the actual versions of wheels are contained in
-    the wheel metadata (the wheels listed in the extra index url have correct versions). Although we
-    don't support Python 3.8 any more (because PyTorch 2.5 dropped support for Python 3.8), the
-    wheels are still built with Python 3.8 ABI to keep the same wheel name as before.
+    注意这些 wheel 都使用 Python 3.8 ABI（相关说明见 [PEP 425](https://peps.python.org/pep-0425/)），因此**兼容 Python 3.8 及更高版本**。wheel 文件名中的版本号（如 `1.0.0.dev`）只是占位，实际 wheel 的版本信息在元数据中（extra index url 下的 wheel 都有正确版本号）。虽然我们已不再支持 Python 3.8（因为 PyTorch 2.5 已停止支持），但 wheel 依旧用 Python 3.8 ABI 编译，以保持名称一致。
 
 # --8<-- [end:pre-built-wheels]
 # --8<-- [start:build-wheel-from-source]
 
-#### Set up using Python-only build (without compilation)
+#### 仅使用 Python 构建（无需编译）
 
-If you only need to change Python code, you can build and install vLLM without compilation. Using `uv pip`'s [`--editable` flag](https://docs.astral.sh/uv/pip/packages/#editable-packages), changes you make to the code will be reflected when you run vLLM:
+如果你只需要修改 Python 代码，可以直接构建并安装 vLLM，无需编译。使用 `uv pip` 的 [`--editable` 参数](https://docs.astral.sh/uv/pip/packages/#editable-packages)，你对代码的修改会实时生效：
 
 ```bash
 git clone https://github.com/vllm-project/vllm.git
@@ -107,34 +99,33 @@ cd vllm
 VLLM_USE_PRECOMPILED=1 uv pip install --editable .
 ```
 
-This command will do the following:
+该命令会执行以下操作：
 
-1. Look for the current branch in your vLLM clone.
-1. Identify the corresponding base commit in the main branch.
-1. Download the pre-built wheel of the base commit.
-1. Use its compiled libraries in the installation.
+1. 检查你当前 vLLM 仓库所在分支。
+1. 找到与主分支对应的基础 commit。
+1. 下载对应 commit 的预编译 wheel 包。
+1. 在安装时使用其中的二进制库。
 
 !!! note
-    1. If you change C++ or kernel code, you cannot use Python-only build; otherwise you will see an import error about library not found or undefined symbol.
-    2. If you rebase your dev branch, it is recommended to uninstall vllm and re-run the above command to make sure your libraries are up to date.
+    1. 如果你修改了 C++ 或 kernel（内核）代码，则不能使用 Python-only 构建，否则会出现库未找到或符号未定义的导入错误。
+    2. 如果你对开发分支进行了 rebase，建议先卸载 vllm，再重新运行上述命令，以确保二进制库是最新的。
 
-In case you see an error about wheel not found when running the above command, it might be because the commit you based on in the main branch was just merged and the wheel is being built. In this case, you can wait for around an hour to try again, or manually assign the previous commit in the installation using the `VLLM_PRECOMPILED_WHEEL_LOCATION` environment variable.
+如果上述命令提示 wheel 未找到，可能是你所依赖的主分支 commit 刚刚合并，wheel 包还在构建中。可等待一小时后重试，或手动指定前一个 commit，通过设置环境变量 `VLLM_PRECOMPILED_WHEEL_LOCATION` 指定 wheel 包地址：
 
 ```bash
-export VLLM_COMMIT=72d9c316d3f6ede485146fe5aabd4e61dbc59069 # use full commit hash from the main branch
+export VLLM_COMMIT=72d9c316d3f6ede485146fe5aabd4e61dbc59069 # 使用主分支上的完整 commit hash
 export VLLM_PRECOMPILED_WHEEL_LOCATION=https://wheels.vllm.ai/${VLLM_COMMIT}/vllm-1.0.0.dev-cp38-abi3-manylinux1_x86_64.whl
 uv pip install --editable .
 ```
 
-You can find more information about vLLM's wheels in [Install the latest code](#install-the-latest-code).
+更多有关 vLLM wheel 的信息，请参考[安装最新代码](#install-the-latest-code)。
 
 !!! note
-    There is a possibility that your source code may have a different commit ID compared to the latest vLLM wheel, which could potentially lead to unknown errors.
-    It is recommended to use the same commit ID for the source code as the vLLM wheel you have installed. Please refer to [Install the latest code](#install-the-latest-code) for instructions on how to install a specified wheel.
+    如果你的源码 commit ID 与已安装 vLLM wheel 不一致，可能会导致未知错误。建议源码和 wheel 使用相同 commit ID。具体安装方法请参考[安装最新代码](#install-the-latest-code)。
 
-#### Full build (with compilation)
+#### 完全编译安装（包含编译过程）
 
-If you want to modify C++ or CUDA code, you'll need to build vLLM from source. This can take several minutes:
+如果你需要修改 C++ 或 CUDA 代码，则必须从源码编译 vLLM。整个过程会花费几分钟：
 
 ```bash
 git clone https://github.com/vllm-project/vllm.git
@@ -143,30 +134,28 @@ uv pip install -e .
 ```
 
 !!! tip
-    Building from source requires a lot of compilation. If you are building from source repeatedly, it's more efficient to cache the compilation results.
+    从源码编译需要大量时间。如果你经常编译，建议启用编译缓存，以加快速度。
 
-    For example, you can install [ccache](https://github.com/ccache/ccache) using `conda install ccache` or `apt install ccache` .
-    As long as `which ccache` command can find the `ccache` binary, it will be used automatically by the build system. After the first build, subsequent builds will be much faster.
+    比如可以用 `conda install ccache` 或 `apt install ccache` 安装 [ccache](https://github.com/ccache/ccache)。只要 `which ccache` 能找到 ccache 二进制，编译系统会自动使用。首次编译后，后续编译会快很多。
 
-    When using `ccache` with `pip install -e .`, you should run `CCACHE_NOHASHDIR="true" pip install --no-build-isolation -e .`. This is because `pip` creates a new folder with a random name for each build, preventing `ccache` from recognizing that the same files are being built.
+    用 `pip install -e .` 时，配合 ccache，建议运行 `CCACHE_NOHASHDIR="true" pip install --no-build-isolation -e .`。因为 pip 每次编译会新建一个随机目录，ccache 可能无法识别重复文件。
 
-    [sccache](https://github.com/mozilla/sccache) works similarly to `ccache`, but has the capability to utilize caching in remote storage environments.
-    The following environment variables can be set to configure the vLLM `sccache` remote: `SCCACHE_BUCKET=vllm-build-sccache SCCACHE_REGION=us-west-2 SCCACHE_S3_NO_CREDENTIALS=1`. We also recommend setting `SCCACHE_IDLE_TIMEOUT=0`.
+    [sccache](https://github.com/mozilla/sccache) 与 ccache 类似，还支持远程存储缓存。可设置如下环境变量配置 vLLM sccache 远程缓存：`SCCACHE_BUCKET=vllm-build-sccache SCCACHE_REGION=us-west-2 SCCACHE_S3_NO_CREDENTIALS=1`，推荐另加 `SCCACHE_IDLE_TIMEOUT=0`。
 
-!!! note "Faster Kernel Development"
-    For frequent C++/CUDA kernel changes, after the initial `uv pip install -e .` setup, consider using the [Incremental Compilation Workflow](../../contributing/incremental_build.md) for significantly faster rebuilds of only the modified kernel code.
+!!! note "更快的内核开发"
+    如果你频繁修改 C++/CUDA 内核代码，首次用 `uv pip install -e .` 安装后，可以采用[增量编译流程](../../contributing/incremental_build.md)，只编译变更的部分，大幅加快重编译速度。
 
-##### Use an existing PyTorch installation
+##### 使用已有的 PyTorch 安装
 
-There are scenarios where the PyTorch dependency cannot be easily installed with `uv`, e.g.:
+有些场景下无法用 `uv` 方便地安装 PyTorch，例如：
 
-- Building vLLM with PyTorch nightly or a custom PyTorch build.
-- Building vLLM with aarch64 and CUDA (GH200), where the PyTorch wheels are not available on PyPI. Currently, only the PyTorch nightly has wheels for aarch64 with CUDA. You can run `uv pip install --index-url https://download.pytorch.org/whl/nightly/cu128 torch torchvision torchaudio` to [install PyTorch nightly](https://pytorch.org/get-started/locally/) and then build vLLM on top of it.
+- 需要用 PyTorch nightly 版或自定义 PyTorch 构建
+- 在 aarch64 + CUDA (GH200) 平台编译 vLLM，而 PyTorch wheel 尚未在 PyPI 发布。目前仅 PyTorch nightly 版提供 aarch64 + CUDA wheel。可用 `uv pip install --index-url https://download.pytorch.org/whl/nightly/cu128 torch torchvision torchaudio` [安装 PyTorch nightly](https://pytorch.org/get-started/locally/)，再编译 vLLM。
 
-To build vLLM using an existing PyTorch installation:
+用已有的 PyTorch 环境编译 vLLM：
 
 ```bash
-# install PyTorch first, either from PyPI or from source
+# 先安装 PyTorch（可用 PyPI 或源码）
 git clone https://github.com/vllm-project/vllm.git
 cd vllm
 python use_existing_torch.py
@@ -174,21 +163,19 @@ uv pip install -r requirements/build.txt
 uv pip install --no-build-isolation -e .
 ```
 
-Alternatively: if you are exclusively using `uv` to create and manage virtual environments, it has [a unique mechanism](https://docs.astral.sh/uv/concepts/projects/config/#disabling-build-isolation)
-for disabling build isolation for specific packages. vLLM can leverage this mechanism to specify `torch` as the package to disable build isolation for:
+另外，如果你一直用 `uv` 管理虚拟环境，它有一套[特殊机制](https://docs.astral.sh/uv/concepts/projects/config/#disabling-build-isolation)可以为指定包禁用构建隔离。vLLM 可利用该机制对 `torch` 禁用隔离：
 
 ```bash
-# install PyTorch first, either from PyPI or from source
+# 先安装 PyTorch（可用 PyPI 或源码）
 git clone https://github.com/vllm-project/vllm.git
 cd vllm
-# pip install -e . does not work directly, only uv can do this
+# pip install -e . 直接用不了，需用 uv
 uv pip install -e .
 ```
 
-##### Use the local cutlass for compilation
+##### 使用本地 cutlass 编译
 
-Currently, before starting the build process, vLLM fetches cutlass code from GitHub. However, there may be scenarios where you want to use a local version of cutlass instead.
-To achieve this, you can set the environment variable VLLM_CUTLASS_SRC_DIR to point to your local cutlass directory.
+目前 vLLM 编译时会自动从 GitHub 拉取 cutlass 代码。有时你可能想用本地的 cutlass 版本，可设置环境变量 VLLM_CUTLASS_SRC_DIR 指向本地 cutlass 目录：
 
 ```bash
 git clone https://github.com/vllm-project/vllm.git
@@ -196,23 +183,21 @@ cd vllm
 VLLM_CUTLASS_SRC_DIR=/path/to/cutlass uv pip install -e .
 ```
 
-##### Troubleshooting
+##### 编译故障排查
 
-To avoid your system being overloaded, you can limit the number of compilation jobs
-to be run simultaneously, via the environment variable `MAX_JOBS`. For example:
+为避免系统负载过高，可用环境变量 `MAX_JOBS` 限制同时编译的任务数，比如：
 
 ```bash
 export MAX_JOBS=6
 uv pip install -e .
 ```
 
-This is especially useful when you are building on less powerful machines. For example, when you use WSL it only [assigns 50% of the total memory by default](https://learn.microsoft.com/en-us/windows/wsl/wsl-config#main-wsl-settings), so using `export MAX_JOBS=1` can avoid compiling multiple files simultaneously and running out of memory.
-A side effect is a much slower build process.
+这在性能较弱的机器上尤其有用。例如 WSL 默认只分配 50% 内存（[官方说明](https://learn.microsoft.com/en-us/windows/wsl/wsl-config#main-wsl-settings)），可用 `export MAX_JOBS=1` 限制只编译一个文件，避免内存耗尽。副作用是编译速度会明显变慢。
 
-Additionally, if you have trouble building vLLM, we recommend using the NVIDIA PyTorch Docker image.
+此外，如果编译 vLLM 遇到问题，建议直接用 NVIDIA 官方 PyTorch Docker 镜像：
 
 ```bash
-# Use `--ipc=host` to make sure the shared memory is large enough.
+# 加上 `--ipc=host`，确保共享内存足够
 docker run \
     --gpus all \
     -it \
@@ -220,25 +205,25 @@ docker run \
     --ipc=host nvcr.io/nvidia/pytorch:23.10-py3
 ```
 
-If you don't want to use docker, it is recommended to have a full installation of CUDA Toolkit. You can download and install it from [the official website](https://developer.nvidia.com/cuda-toolkit-archive). After installation, set the environment variable `CUDA_HOME` to the installation path of CUDA Toolkit, and make sure that the `nvcc` compiler is in your `PATH`, e.g.:
+如果不想用 Docker，建议完整安装 CUDA Toolkit。可从[官方页面](https://developer.nvidia.com/cuda-toolkit-archive)下载并安装。安装后，设置环境变量 `CUDA_HOME` 指向 CUDA Toolkit 路径，并确保 `nvcc` 编译器已加入 `PATH`，例如：
 
 ```bash
 export CUDA_HOME=/usr/local/cuda
 export PATH="${CUDA_HOME}/bin:$PATH"
 ```
 
-Here is a sanity check to verify that the CUDA Toolkit is correctly installed:
+安装完毕后，可通过以下方式检查 CUDA Toolkit 是否正常：
 
 ```bash
-nvcc --version # verify that nvcc is in your PATH
-${CUDA_HOME}/bin/nvcc --version # verify that nvcc is in your CUDA_HOME
+nvcc --version # 检查 nvcc 是否在 PATH 中
+${CUDA_HOME}/bin/nvcc --version # 检查 nvcc 是否在 CUDA_HOME 路径下
 ```
 
-#### Unsupported OS build
+#### 不支持的系统编译
 
-vLLM can fully run only on Linux but for development purposes, you can still build it on other systems (for example, macOS), allowing for imports and a more convenient development environment. The binaries will not be compiled and won't work on non-Linux systems.
+vLLM 仅能在 Linux 上完整运行，但在其他系统（如 macOS）也可用于开发，比如可以正常导入模块，方便调试，但二进制文件不会被编译，不能在非 Linux 系统运行。
 
-Simply disable the `VLLM_TARGET_DEVICE` environment variable before installing:
+只需在安装前禁用 `VLLM_TARGET_DEVICE` 环境变量即可：
 
 ```bash
 export VLLM_TARGET_DEVICE=empty
@@ -248,27 +233,27 @@ uv pip install -e .
 # --8<-- [end:build-wheel-from-source]
 # --8<-- [start:pre-built-images]
 
-See [Using Docker](../../deployment/docker.md) for instructions on using the official Docker image.
+关于如何使用官方 Docker 镜像，请参考[Docker 使用方法](../../deployment/docker.md)。
 
-Another way to access the latest code is to use the docker images:
+另一种获取最新代码的方式是使用 docker 镜像：
 
 ```bash
-export VLLM_COMMIT=33f460b17a54acb3b6cc0b03f4a17876cff5eafd # use full commit hash from the main branch
+export VLLM_COMMIT=33f460b17a54acb3b6cc0b03f4a17876cff5eafd # 使用主分支上的完整 commit hash
 docker pull public.ecr.aws/q9t5s3a7/vllm-ci-postmerge-repo:${VLLM_COMMIT}
 ```
 
-These docker images are used for CI and testing only, and they are not intended for production use. They will be expired after several days.
+这些 docker 镜像仅用于持续集成和测试，并不适用于生产环境。镜像会在几天后自动过期。
 
-The latest code can contain bugs and may not be stable. Please use it with caution.
+请注意，最新代码可能存在 bug，稳定性无法保证，请谨慎使用。
 
 # --8<-- [end:pre-built-images]
 # --8<-- [start:build-image-from-source]
 
-See [Building vLLM's Docker Image from Source](../../deployment/docker.md#building-vllms-docker-image-from-source) for instructions on building the Docker image.
+关于如何从源码构建 vLLM 的 Docker 镜像，请参考[构建方法](../../deployment/docker.md#building-vllms-docker-image-from-source)。
 
 # --8<-- [end:build-image-from-source]
 # --8<-- [start:supported-features]
 
-See [Feature x Hardware](../../features/README.md#feature-x-hardware) compatibility matrix for feature support information.
+关于功能支持和硬件兼容性，请查阅[功能 x 硬件支持矩阵](../../features/README.md#feature-x-hardware)。
 
 # --8<-- [end:supported-features]

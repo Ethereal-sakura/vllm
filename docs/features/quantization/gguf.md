@@ -1,81 +1,81 @@
 # GGUF
 
 !!! warning
-    Please note that GGUF support in vLLM is highly experimental and under-optimized at the moment, it might be incompatible with other features. Currently, you can use GGUF as a way to reduce memory footprint. If you encounter any issues, please report them to the vLLM team.
+    请注意，目前 vLLM 对 GGUF 的支持还处于高度实验阶段，且优化不足，可能与其他功能不兼容。目前，你可以使用 GGUF 来减少内存占用。如果遇到任何问题，请及时反馈给 vLLM 团队。
 
 !!! warning
-    Currently, vllm only supports loading single-file GGUF models. If you have a multi-files GGUF model, you can use [gguf-split](https://github.com/ggerganov/llama.cpp/pull/6135) tool to merge them to a single-file model.
+    目前，vllm 只支持加载单文件的 GGUF 模型。如果你拥有多文件的 GGUF 模型，可以使用 [gguf-split](https://github.com/ggerganov/llama.cpp/pull/6135) 工具将其合并为单文件模型。
 
-To run a GGUF model with vLLM, you can download and use the local GGUF model from [TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF](https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF) with the following command:
+要在 vLLM 中运行 GGUF 模型，你可以从 [TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF](https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF) 下载本地 GGUF 模型，并通过以下命令加载：
 
 ```bash
 wget https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
-# We recommend using the tokenizer from base model to avoid long-time and buggy tokenizer conversion.
+# 建议使用基础模型的 tokenizer，可以避免耗时且容易出错的 tokenizer 转换过程。
 vllm serve ./tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
    --tokenizer TinyLlama/TinyLlama-1.1B-Chat-v1.0
 ```
 
-You can also add `--tensor-parallel-size 2` to enable tensor parallelism inference with 2 GPUs:
+你还可以添加 `--tensor-parallel-size 2` 参数，在两张 GPU 上进行张量并行推理：
 
 ```bash
-# We recommend using the tokenizer from base model to avoid long-time and buggy tokenizer conversion.
+# 建议使用基础模型的 tokenizer，可以避免耗时且容易出错的 tokenizer 转换过程。
 vllm serve ./tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
    --tokenizer TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
    --tensor-parallel-size 2
 ```
 
 !!! warning
-    We recommend using the tokenizer from base model instead of GGUF model. Because the tokenizer conversion from GGUF is time-consuming and unstable, especially for some models with large vocab size.
+    强烈建议使用基础模型的 tokenizer，而不是 GGUF 模型自带的 tokenizer。因为从 GGUF 模型转换 tokenizer 的过程非常耗时且不稳定，特别是对于词表较大的模型。
 
-GGUF assumes that huggingface can convert the metadata to a config file. In case huggingface doesn't support your model you can manually create a config and pass it as hf-config-path
+GGUF 假定 huggingface 能够将元数据转换为 config 文件。如果 huggingface 不支持你的模型，你可以手动创建 config，并通过 hf-config-path 参数传入。
 
 ```bash
-# If you model is not supported by huggingface you can manually provide a huggingface compatible config path
+# 如果 huggingface 不支持你的模型，可以手动指定一个兼容 huggingface 的 config 路径
 vllm serve ./tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
    --tokenizer TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
    --hf-config-path Tinyllama/TInyLlama-1.1B-Chat-v1.0
 ```
 
-You can also use the GGUF model directly through the LLM entrypoint:
+你也可以通过 LLM 入口直接使用 GGUF 模型：
 
 ??? code
 
       ```python
       from vllm import LLM, SamplingParams
 
-      # In this script, we demonstrate how to pass input to the chat method:
+      # 本示例演示如何使用 chat 方法传递输入：
       conversation = [
          {
             "role": "system",
-            "content": "You are a helpful assistant",
+            "content": "你是一位乐于助人的助手",
          },
          {
             "role": "user",
-            "content": "Hello",
+            "content": "你好",
          },
          {
             "role": "assistant",
-            "content": "Hello! How can I assist you today?",
+            "content": "你好！我有什么可以帮您的吗？",
          },
          {
             "role": "user",
-            "content": "Write an essay about the importance of higher education.",
+            "content": "写一篇关于高等教育重要性的文章。",
          },
       ]
 
-      # Create a sampling params object.
+      # 创建采样参数对象。
       sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
 
-      # Create an LLM.
+      # 创建 LLM 实例。
       llm = LLM(
          model="./tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
          tokenizer="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
       )
-      # Generate texts from the prompts. The output is a list of RequestOutput objects
-      # that contain the prompt, generated text, and other information.
+      # 根据输入生成文本。输出为 RequestOutput 对象列表，
+      # 包含原始输入、生成结果及其他信息。
       outputs = llm.chat(conversation, sampling_params)
 
-      # Print the outputs.
+      # 打印输出结果。
       for output in outputs:
          prompt = output.prompt
          generated_text = output.outputs[0].text

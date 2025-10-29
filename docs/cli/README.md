@@ -1,12 +1,12 @@
-# vLLM CLI Guide
+# vLLM CLI 指南
 
-The vllm command-line tool is used to run and manage vLLM models. You can start by viewing the help message with:
+vllm 命令行工具用于运行和管理 vLLM 模型。你可以通过以下命令查看帮助信息：
 
 ```bash
 vllm --help
 ```
 
-Available Commands:
+可用命令如下：
 
 ```bash
 vllm {chat,complete,serve,bench,collect-env,run-batch}
@@ -14,88 +14,88 @@ vllm {chat,complete,serve,bench,collect-env,run-batch}
 
 ## serve
 
-Starts the vLLM OpenAI Compatible API server.
+启动 vLLM 的 OpenAI 兼容 API 服务端。
 
-Start with a model:
+启动指定模型：
 
 ```bash
 vllm serve meta-llama/Llama-2-7b-hf
 ```
 
-Specify the port:
+指定端口：
 
 ```bash
 vllm serve meta-llama/Llama-2-7b-hf --port 8100
 ```
 
-Serve over a Unix domain socket:
+通过 Unix 域套接字启动服务：
 
 ```bash
 vllm serve meta-llama/Llama-2-7b-hf --uds /tmp/vllm.sock
 ```
 
-Check with --help for more options:
+使用 --help 获取更多选项：
 
 ```bash
-# To list all groups
+# 列出所有参数分组
 vllm serve --help=listgroup
 
-# To view a argument group
+# 查看某个参数分组
 vllm serve --help=ModelConfig
 
-# To view a single argument
+# 查看某个单独参数
 vllm serve --help=max-num-seqs
 
-# To search by keyword
+# 关键词搜索参数
 vllm serve --help=max
 
-# To view full help with pager (less/more)
+# 分页查看完整帮助（less/more）
 vllm serve --help=page
 ```
 
-See [vllm serve](./serve.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm serve](./serve.md) 
 
 ## chat
 
-Generate chat completions via the running API server.
+通过已运行的 API 服务生成对话补全。
 
 ```bash
-# Directly connect to localhost API without arguments
+# 直接连接本地 API，无需参数
 vllm chat
 
-# Specify API url
+# 指定 API 地址
 vllm chat --url http://{vllm-serve-host}:{vllm-serve-port}/v1
 
-# Quick chat with a single prompt
+# 快速对话，只需一句提示语
 vllm chat --quick "hi"
 ```
 
-See [vllm chat](./chat.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm chat](./chat.md) 
 
 ## complete
 
-Generate text completions based on the given prompt via the running API server.
+通过已运行的 API 服务，根据给定提示生成文本补全。
 
 ```bash
-# Directly connect to localhost API without arguments
+# 直接连接本地 API，无需参数
 vllm complete
 
-# Specify API url
+# 指定 API 地址
 vllm complete --url http://{vllm-serve-host}:{vllm-serve-port}/v1
 
-# Quick complete with a single prompt
+# 快速补全，一句话提示
 vllm complete --quick "The future of AI is"
 ```
 
-See [vllm complete](./complete.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm complete](./complete.md) 
 
 ## bench
 
-Run benchmark tests for latency online serving throughput and offline inference throughput.
+在线服务延迟和离线推理吞吐量基准测试。
 
-To use benchmark commands, please install with extra dependencies using `pip install vllm[bench]`.
+如需使用基准测试相关命令，请通过 `pip install vllm[bench]` 安装额外依赖。
 
-Available Commands:
+可用子命令如下：
 
 ```bash
 vllm bench {latency, serve, throughput}
@@ -103,7 +103,7 @@ vllm bench {latency, serve, throughput}
 
 ### latency
 
-Benchmark the latency of a single batch of requests.
+测试单批请求的延迟表现。
 
 ```bash
 vllm bench latency \
@@ -114,11 +114,11 @@ vllm bench latency \
     --load-format dummy
 ```
 
-See [vllm bench latency](./bench/latency.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm bench latency](./bench/latency.md) 
 
 ### serve
 
-Benchmark the online serving throughput.
+测试在线服务的吞吐量。
 
 ```bash
 vllm bench serve \
@@ -130,11 +130,11 @@ vllm bench serve \
     --num-prompts  5
 ```
 
-See [vllm bench serve](./bench/serve.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm bench serve](./bench/serve.md) 
 
 ### throughput
 
-Benchmark offline inference throughput.
+测试离线推理的吞吐量。
 
 ```bash
 vllm bench throughput \
@@ -145,11 +145,11 @@ vllm bench throughput \
     --load-format dummy
 ```
 
-See [vllm bench throughput](./bench/throughput.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm bench throughput](./bench/throughput.md) 
 
 ## collect-env
 
-Start collecting environment information.
+收集环境信息。
 
 ```bash
 vllm collect-env
@@ -157,9 +157,9 @@ vllm collect-env
 
 ## run-batch
 
-Run batch prompts and write results to file.
+批量运行提示语，将结果写入文件。
 
-Running with a local file:
+本地文件运行示例：
 
 ```bash
 vllm run-batch \
@@ -168,7 +168,7 @@ vllm run-batch \
     --model meta-llama/Meta-Llama-3-8B-Instruct
 ```
 
-Using remote file:
+远程文件运行示例：
 
 ```bash
 vllm run-batch \
@@ -177,11 +177,11 @@ vllm run-batch \
     --model meta-llama/Meta-Llama-3-8B-Instruct
 ```
 
-See [vllm run-batch](./run-batch.md) for the full reference of all available arguments.
+完整参数说明请参见 [vllm run-batch](./run-batch.md) 
 
-## More Help
+## 更多帮助
 
-For detailed options of any subcommand, use:
+如需查看任意子命令的详细选项，可使用：
 
 ```bash
 vllm <subcommand> --help

@@ -1,12 +1,12 @@
-# Conserving Memory
+# 节省内存
 
-Large models might cause your machine to run out of memory (OOM). Here are some options that help alleviate this problem.
+大型模型有可能导致你的设备内存不足（OOM）。下面介绍几种缓解这一问题的方法。
 
-## Tensor Parallelism (TP)
+## 张量并行（Tensor Parallelism，TP）
 
-Tensor parallelism (`tensor_parallel_size` option) can be used to split the model across multiple GPUs.
+张量并行（通过 `tensor_parallel_size` 参数设置）可以让模型在多张 GPU 间进行分布式拆分。
 
-The following code splits the model across 2 GPUs.
+以下代码实现了将模型拆分到 2 张 GPU 上：
 
 ```python
 from vllm import LLM
@@ -15,29 +15,27 @@ llm = LLM(model="ibm-granite/granite-3.1-8b-instruct", tensor_parallel_size=2)
 ```
 
 !!! warning
-    To ensure that vLLM initializes CUDA correctly, you should avoid calling related functions (e.g. [torch.cuda.set_device][])
-    before initializing vLLM. Otherwise, you may run into an error like `RuntimeError: Cannot re-initialize CUDA in forked subprocess`.
+    为确保 vLLM 正确初始化 CUDA，请不要在初始化 vLLM 之前调用相关函数（如 [torch.cuda.set_device][]）  
+    否则可能会遇到 `RuntimeError: Cannot re-initialize CUDA in forked subprocess` 这类错误。
 
-    To control which devices are used, please instead set the `CUDA_VISIBLE_DEVICES` environment variable.
+    如果需要控制使用哪些设备，请通过设置 `CUDA_VISIBLE_DEVICES` 环境变量来实现。
 
 !!! note
-    With tensor parallelism enabled, each process will read the whole model and split it into chunks, which makes the disk reading time even longer (proportional to the size of tensor parallelism).
+    开启张量并行后，每个进程都会读取完整的模型并将其拆分为多个部分，因此模型的磁盘读取时间会变长（与张量并行的规模成正比）。
 
-    You can convert the model checkpoint to a sharded checkpoint using [examples/offline_inference/save_sharded_state.py](../../examples/offline_inference/save_sharded_state.py). The conversion process might take some time, but later you can load the sharded checkpoint much faster. The model loading time should remain constant regardless of the size of tensor parallelism.
+    你可以使用 [examples/offline_inference/save_sharded_state.py](../../examples/offline_inference/save_sharded_state.py) 将模型权重转换为分片（sharded）格式。虽然转换过程会花费一些时间，但之后加载分片权重会快很多。无论张量并行规模如何，加载模型的耗时都将保持稳定。
 
-## Quantization
+## 量化（Quantization）
 
-Quantized models take less memory at the cost of lower precision.
+量化后的模型可以显著减少内存占用，不过会牺牲一定的精度。
 
-Statically quantized models can be downloaded from HF Hub (some popular ones are available at [Red Hat AI](https://huggingface.co/RedHatAI))
-and used directly without extra configuration.
+静态量化模型可以直接从 HF Hub 下载（部分常用模型可在 [Red Hat AI](https://huggingface.co/RedHatAI) 找到），无需额外配置即可使用。
 
-Dynamic quantization is also supported via the `quantization` option -- see [here](../features/quantization/README.md) for more details.
+同时也支持动态量化方式，通过 `quantization` 选项开启——详细用法见 [这里](../features/quantization/README.md)。
 
-## Context length and batch size
+## 上下文长度与批大小
 
-You can further reduce memory usage by limiting the context length of the model (`max_model_len` option)
-and the maximum batch size (`max_num_seqs` option).
+你还可以通过限制模型的上下文长度（`max_model_len` 参数）以及最大批处理数量（`max_num_seqs` 参数）来进一步降低内存使用。
 
 ```python
 from vllm import LLM
@@ -45,14 +43,14 @@ from vllm import LLM
 llm = LLM(model="adept/fuyu-8b", max_model_len=2048, max_num_seqs=2)
 ```
 
-## Reduce CUDA Graphs
+## 减少 CUDA 图（CUDA Graphs）占用
 
-By default, we optimize model inference using CUDA graphs which take up extra memory in the GPU.
+默认情况下，vLLM 通过 CUDA 图优化模型推理，这会在 GPU 上占用额外内存。
 
 !!! warning
-    CUDA graph capture takes up more memory in V1 than in V0.
+    CUDA 图捕获在 V1 版本中会比 V0 版本占用更多内存。
 
-You can adjust `compilation_config` to achieve a better balance between inference speed and memory usage:
+你可以调整 `compilation_config` 参数，在推理速度和内存占用之间做更好的平衡：
 
 ??? code
 
@@ -64,13 +62,13 @@ You can adjust `compilation_config` to achieve a better balance between inferenc
         model="meta-llama/Llama-3.1-8B-Instruct",
         compilation_config=CompilationConfig(
             mode=CompilationMode.VLLM_COMPILE,
-            # By default, it goes up to max_num_seqs
+            # 默认会按最大 batch 尺寸生成
             cudagraph_capture_sizes=[1, 2, 4, 8, 16],
         ),
     )
     ```
 
-You can disable graph capturing completely via the `enforce_eager` flag:
+你也可以通过 `enforce_eager` 参数完全关闭 CUDA 图捕获：
 
 ```python
 from vllm import LLM
@@ -78,71 +76,70 @@ from vllm import LLM
 llm = LLM(model="meta-llama/Llama-3.1-8B-Instruct", enforce_eager=True)
 ```
 
-## Adjust cache size
+## 调整缓存大小
 
-If you run out of CPU RAM, try the following options:
+如果你的 CPU 内存不足，可以尝试以下方法：
 
-- (Multi-modal models only) you can set the size of multi-modal cache by setting `mm_processor_cache_gb` engine argument (default 4 GiB).
-- (CPU backend only) you can set the size of KV cache using `VLLM_CPU_KVCACHE_SPACE` environment variable (default 4 GiB).
+- （仅限多模态模型）可以通过 `mm_processor_cache_gb` 引擎参数设置多模态缓存大小（默认 4 GiB）。
+- （仅限 CPU 后端）可以通过设置 `VLLM_CPU_KVCACHE_SPACE` 环境变量来调整 KV 缓存大小（默认 4 GiB）。
 
-## Multi-modal input limits
+## 多模态输入限制
 
-You can allow a smaller number of multi-modal items per prompt to reduce the memory footprint of the model:
+你可以通过限制每个提示中多模态内容的数量，从而减少模型的内存占用：
 
 ```python
 from vllm import LLM
 
-# Accept up to 3 images and 1 video per prompt
+# 每个提示最多接受 3 张图片和 1 个视频
 llm = LLM(
     model="Qwen/Qwen2.5-VL-3B-Instruct",
     limit_mm_per_prompt={"image": 3, "video": 1},
 )
 ```
 
-You can go a step further and disable unused modalities completely by setting its limit to zero.
-For example, if your application only accepts image input, there is no need to allocate any memory for videos.
+你也可以进一步，通过将未使用的模态内容数量设为零，彻底关闭不需要的模态。例如，如果你的应用只需图片输入，则无需为视频分配内存。
 
 ```python
 from vllm import LLM
 
-# Accept any number of images but no videos
+# 图片数量不限，但不接受视频
 llm = LLM(
     model="Qwen/Qwen2.5-VL-3B-Instruct",
     limit_mm_per_prompt={"video": 0},
 )
 ```
 
-You can even run a multi-modal model for text-only inference:
+甚至可以只用多模态模型跑纯文本推理：
 
 ```python
 from vllm import LLM
 
-# Don't accept images. Just text.
+# 不接受图片，仅文本输入
 llm = LLM(
     model="google/gemma-3-27b-it",
     limit_mm_per_prompt={"image": 0},
 )
 ```
 
-### Configurable options
+### 可配置选项
 
-`limit_mm_per_prompt` also accepts configurable options per modality. In the configurable form, you still specify `count`, and you may optionally provide size hints that control how vLLM profiles and reserves memory for your multi‑modal inputs. This helps you tune memory for the actual media you expect, instead of the model’s absolute maxima.
+`limit_mm_per_prompt` 还支持按模态提供更细致的可配置选项。在可配置模式下，你依然需要填写 `count`，并可以选择性设置尺寸等参数，这样 vLLM 会根据你的实际媒体需求来预估和分配内存，而不是按照模型的极限最大值来分配。
 
-Configurable options by modality:
+不同模态可配置的参数如下：
 
-- `image`: `{"count": int, "width": int, "height": int}`
-- `video`: `{"count": int, "num_frames": int, "width": int, "height": int}`
-- `audio`: `{"count": int, "length": int}`
+- `image`：`{"count": int, "width": int, "height": int}`
+- `video`：`{"count": int, "num_frames": int, "width": int, "height": int}`
+- `audio`：`{"count": int, "length": int}`
 
-Details could be found in [`ImageDummyOptions`][vllm.config.multimodal.ImageDummyOptions], [`VideoDummyOptions`][vllm.config.multimodal.VideoDummyOptions], and [`AudioDummyOptions`][vllm.config.multimodal.AudioDummyOptions].
+详细说明可查阅 [`ImageDummyOptions`][vllm.config.multimodal.ImageDummyOptions]、[`VideoDummyOptions`][vllm.config.multimodal.VideoDummyOptions] 和 [`AudioDummyOptions`][vllm.config.multimodal.AudioDummyOptions]。
 
-Examples:
+举例如下：
 
 ```python
 from vllm import LLM
 
-# Up to 5 images per prompt, profile with 512x512.
-# Up to 1 video per prompt, profile with 32 frames at 640x640.
+# 每个提示最多 5 张图片，按 512x512 尺寸预估
+# 每个提示最多 1 个视频，按 32 帧 640x640 尺寸预估
 llm = LLM(
     model="Qwen/Qwen2.5-VL-3B-Instruct",
     limit_mm_per_prompt={
@@ -152,37 +149,36 @@ llm = LLM(
 )
 ```
 
-For backward compatibility, passing an integer works as before and is interpreted as `{"count": <int>}`. For example:
+为兼容旧版本，传递一个整数的写法依然有效，并等价于 `{"count": <int>}`。例如：
 
-- `limit_mm_per_prompt={"image": 5}` is equivalent to `limit_mm_per_prompt={"image": {"count": 5}}`
-- You can mix formats: `limit_mm_per_prompt={"image": 5, "video": {"count": 1, "num_frames": 32, "width": 640, "height": 640}}`
+- `limit_mm_per_prompt={"image": 5}` 等同于 `limit_mm_per_prompt={"image": {"count": 5}}`
+- 你可以混合使用不同格式：`limit_mm_per_prompt={"image": 5, "video": {"count": 1, "num_frames": 32, "width": 640, "height": 640}}`
 
 !!! note
-    - The size hints affect memory profiling only. They shape the dummy inputs used to compute reserved activation sizes. They do not change how inputs are actually processed at inference time.
-    - If a hint exceeds what the model can accept, vLLM clamps it to the model's effective maximum and may log a warning.
+    - 这些尺寸参数只影响内存预估，用于生成虚拟输入计算模型的激活内存预留，不会影响实际推理时输入的处理方式。
+    - 如果你设置的参数超过模型支持的最大值，vLLM 会自动将其限制在模型允许的范围内，并可能输出警告日志。
 
 !!! warning
-    These size hints currently only affect activation memory profiling. Encoder cache size is determined by the actual inputs at runtime and is not limited by these hints.
+    目前这些尺寸参数只影响激活内存的预估。编码器缓存（encoder cache）的大小取决于实际推理时的输入内容，不受这些参数限制。
 
-## Multi-modal processor arguments
+## 多模态处理器参数
 
-For certain models, you can adjust the multi-modal processor arguments to
-reduce the size of the processed multi-modal inputs, which in turn saves memory.
+对于某些模型，你可以通过调整多模态处理器参数，进一步缩小处理后多模态输入的尺寸，从而节省内存。
 
-Here are some examples:
+例如：
 
 ```python
 from vllm import LLM
 
-# Available for Qwen2-VL series models
+# Qwen2-VL 系列模型可用
 llm = LLM(
     model="Qwen/Qwen2.5-VL-3B-Instruct",
-    mm_processor_kwargs={"max_pixels": 768 * 768},  # Default is 1280 * 28 * 28
+    mm_processor_kwargs={"max_pixels": 768 * 768},  # 默认值为 1280 * 28 * 28
 )
 
-# Available for InternVL series models
+# InternVL 系列模型可用
 llm = LLM(
     model="OpenGVLab/InternVL2-2B",
-    mm_processor_kwargs={"max_dynamic_patch": 4},  # Default is 12
+    mm_processor_kwargs={"max_dynamic_patch": 4},  # 默认值为 12
 )
 ```

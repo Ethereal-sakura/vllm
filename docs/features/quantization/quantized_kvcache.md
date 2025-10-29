@@ -1,42 +1,41 @@
-# Quantized KV Cache
+# 量化 KV 缓存（Quantized KV Cache）
 
-## FP8 KV Cache
+## FP8 KV 缓存
 
-Quantizing the KV cache to FP8 reduces its memory footprint. This increases the number of tokens that can be stored in the cache, improving throughput.
+将 KV 缓存量化为 FP8，可以大幅降低内存占用。这意味着缓存中可以存储更多的 token，从而提升整体吞吐量。
 
-### FP8 Formats
+### FP8 格式
 
-[OCP (Open Compute Project)](https://www.opencompute.org) specifies two common 8-bit floating point data formats:
+[OCP（开放计算项目，Open Compute Project）](https://www.opencompute.org) 定义了两种常见的 8 位浮点数据格式：
 
-- E5M2 (5 exponent bits and 2 mantissa bits)
-- E4M3FN (4 exponent bits and 3 mantissa bits, often shortened as E4M3)
+- E5M2（5 位指数，2 位尾数）
+- E4M3FN（4 位指数，3 位尾数，通常简称为 E4M3）
 
-The E4M3 format offers higher precision compared to E5M2. However, due to its small dynamic range (±240.0), E4M3 typically requires a higher-precision (FP32) scaling factor alongside each quantized tensor.
+E4M3 格式相比 E5M2 精度更高。但由于其动态范围较小（±240.0），E4M3 通常需要为每个量化张量额外配备一个高精度（FP32）缩放因子。
 
-### Current Limitations
+### 当前限制
 
-For now, only per-tensor (scalar) scaling factors are supported. Development is ongoing to support scaling factors of a finer granularity (e.g. per-channel).
+目前只支持每个张量（标量）缩放因子。后续会逐步支持更细粒度的缩放因子（比如每通道）。
 
-### Performance Impact
+### 性能影响
 
-The current FP8 KV cache implementation primarily benefits throughput by allowing approximately double the amount of space for KV cache allocation. This enables either:
+当前的 FP8 KV 缓存实现，主要通过为 KV 缓存分配大约两倍空间，从而提升吞吐量。这带来的优势包括：
 
-- Processing longer context lengths for individual requests, or
-- Handling more concurrent request batches
+- 单次请求可处理更长的上下文，或
+- 可同时处理更多的并发批次
 
-However, there are currently no latency improvements as the implementation does not yet include fused dequantization and attention operations. Future releases will support quantized attention with hardware acceleration, which should provide additional performance benefits. While the most recent silicon offerings (e.g. AMD MI300, NVIDIA Hopper or later) support native hardware conversion between FP8 and other formats (fp32, fp16, bf16), this benefit is not yet fully realized.
+目前延迟尚未降低，因为还没有实现解量化和注意力操作的融合。未来版本将会支持硬件加速的量化注意力，从而带来更高的性能。现在一些新一代芯片（比如 AMD MI300、NVIDIA Hopper 及之后的产品）已经支持 FP8 与其他格式（fp32、fp16、bf16）之间的硬件级转换，但目前还未完全释放这些硬件的全部潜力。
 
-Studies have shown that FP8 E4M3 quantization typically only minimally degrades inference accuracy, making it a practical choice for throughput optimization.
+研究显示，FP8 E4M3 量化对推理精度影响很小，因此非常适合用于提升吞吐量。
 
-## Usage Example
+## 使用示例
 
-Here is an example of how to enable FP8 quantization:
+下面是开启 FP8 量化的示例：
 
 ??? code
 
     ```python
-    # To calculate kv cache scales on the fly enable the calculate_kv_scales
-    # parameter
+    # 开启 calculate_kv_scales 参数，可自动计算 kv 缓存缩放因子
 
     from vllm import LLM, SamplingParams
 
@@ -51,27 +50,27 @@ Here is an example of how to enable FP8 quantization:
     print(out)
     ```
 
-The `kv_cache_dtype` argument specifies the data type for KV cache storage:
+参数 `kv_cache_dtype` 用于指定 KV 缓存的存储数据类型：
 
-- `"auto"`: Uses the model's default "unquantized" data type
-- `"fp8"` or `"fp8_e4m3"`: Supported on CUDA 11.8+ and ROCm (AMD GPU)
-- `"fp8_e5m2"`: Supported on CUDA 11.8+
+- `"auto"`：使用模型默认的“未量化”数据类型
+- `"fp8"` 或 `"fp8_e4m3"`：支持 CUDA 11.8+ 及 ROCm（AMD GPU）
+- `"fp8_e5m2"`：支持 CUDA 11.8+
 
-## Calibrated Scales for Better Accuracy
+## 更高精度的校准缩放因子
 
-For optimal model quality when using FP8 KV Cache, we recommend using calibrated scales tuned to representative inference data. [LLM Compressor](https://github.com/vllm-project/llm-compressor/) is the recommended tool for this process.
+如果希望在使用 FP8 KV 缓存时获得更优的模型表现，推荐使用针对实际推理数据校准过的缩放因子。[LLM Compressor](https://github.com/vllm-project/llm-compressor/) 是推荐的工具。
 
-### Installation
+### 安装方法
 
-First, install the required dependencies:
+首先安装所需依赖：
 
 ```bash
 pip install llmcompressor
 ```
 
-### Example Usage
+### 使用示例
 
-Here's a complete example using `meta-llama/Llama-3.1-8B-Instruct` (most models can use this same pattern):
+以下是以 `meta-llama/Llama-3.1-8B-Instruct` 为例的完整流程（大部分模型都能用类似方式）：
 
 ??? code
 
@@ -80,20 +79,20 @@ Here's a complete example using `meta-llama/Llama-3.1-8B-Instruct` (most models 
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from llmcompressor.transformers import oneshot
 
-    # Select model and load it
+    # 选择模型并加载
     MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
     model = AutoModelForCausalLM.from_pretrained(MODEL_ID, device_map="auto", dtype="auto")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
-    # Select calibration dataset
+    # 选择校准数据集
     DATASET_ID = "HuggingFaceH4/ultrachat_200k"
     DATASET_SPLIT = "train_sft"
 
-    # Configure calibration parameters
-    NUM_CALIBRATION_SAMPLES = 512  # 512 samples is a good starting point
+    # 设置校准参数
+    NUM_CALIBRATION_SAMPLES = 512  # 建议从 512 条样本开始
     MAX_SEQUENCE_LENGTH = 2048
 
-    # Load and preprocess dataset
+    # 加载并预处理数据集
     ds = load_dataset(DATASET_ID, split=DATASET_SPLIT)
     ds = ds.shuffle(seed=42).select(range(NUM_CALIBRATION_SAMPLES))
 
@@ -109,7 +108,7 @@ Here's a complete example using `meta-llama/Llama-3.1-8B-Instruct` (most models 
 
     ds = ds.map(process_and_tokenize, remove_columns=ds.column_names)
 
-    # Configure quantization settings
+    # 配置量化策略
     recipe = """
     quant_stage:
         quant_modifiers:
@@ -122,7 +121,7 @@ Here's a complete example using `meta-llama/Llama-3.1-8B-Instruct` (most models 
                     symmetric: true
     """
 
-    # Apply quantization
+    # 执行量化
     oneshot(
         model=model,
         dataset=ds,
@@ -131,15 +130,15 @@ Here's a complete example using `meta-llama/Llama-3.1-8B-Instruct` (most models 
         num_calibration_samples=NUM_CALIBRATION_SAMPLES,
     )
 
-    # Save quantized model: Llama-3.1-8B-Instruct-FP8-KV
+    # 保存量化后的模型，例如：Llama-3.1-8B-Instruct-FP8-KV
     SAVE_DIR = MODEL_ID.split("/")[1] + "-FP8-KV"
     model.save_pretrained(SAVE_DIR, save_compressed=True)
     tokenizer.save_pretrained(SAVE_DIR)
     ```
 
-The above script will create a folder in your current directory containing your quantized model (e.g., `Llama-3.1-8B-Instruct-FP8-KV`) with calibrated scales.
+上面的脚本会在当前目录下生成一个包含量化模型（如 `Llama-3.1-8B-Instruct-FP8-KV`）及校准缩放因子的文件夹。
 
-When running the model you must specify `kv_cache_dtype="fp8"` in order to enable the kv cache quantization and use the scales.
+使用模型时，请确保指定 `kv_cache_dtype="fp8"`，以启用 kv 缓存量化及相应缩放因子。
 
 ```python
 from vllm import LLM, SamplingParams

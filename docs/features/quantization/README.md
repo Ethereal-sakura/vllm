@@ -1,8 +1,8 @@
-# Quantization
+# 量化（Quantization）
 
-Quantization trades off model precision for smaller memory footprint, allowing large models to be run on a wider range of devices.
+量化是一种用模型精度换取更小内存占用的技术，这样可以让大型模型在更多类型的设备上运行。
 
-Contents:
+目录：
 
 - [AutoAWQ](auto_awq.md)
 - [AutoRound](auto_round.md)
@@ -19,9 +19,9 @@ Contents:
 - [Quantized KV Cache](quantized_kvcache.md)
 - [TorchAO](torchao.md)
 
-## Supported Hardware
+## 支持的硬件平台
 
-The table below shows the compatibility of various quantization implementations with different hardware platforms in vLLM:
+下表展示了在 vLLM 中，不同量化实现与各类硬件平台的兼容情况：
 
 <style>
 td:not(:first-child) {
@@ -57,11 +57,11 @@ th:not(:first-child) {
 | GGUF                  | ✅︎      | ✅︎       | ✅︎       | ✅︎    | ✅︎       | ✅︎         | ❌          | ❌         | ❌        | ❌           |
 | INC (W8A8)            | ❌      | ❌       | ❌       | ❌    | ❌       | ❌         | ❌          | ✅︎         | ❌        | ❌           |
 
-- Volta refers to SM 7.0, Turing to SM 7.5, Ampere to SM 8.0/8.6, Ada to SM 8.9, and Hopper to SM 9.0.
-- ✅︎ indicates that the quantization method is supported on the specified hardware.
-- ❌ indicates that the quantization method is not supported on the specified hardware.
+- Volta 指的是 SM 7.0，Turing 是 SM 7.5，Ampere 为 SM 8.0/8.6，Ada 为 SM 8.9，Hopper 为 SM 9.0
+- ✅︎ 表示该量化方法在对应硬件上受支持
+- ❌ 表示该量化方法在对应硬件上不受支持
 
 !!! note
-    This compatibility chart is subject to change as vLLM continues to evolve and expand its support for different hardware platforms and quantization methods.
+    此兼容性表格会随着 vLLM 持续更新和对新硬件及量化方法的支持而变化。
 
-    For the most up-to-date information on hardware support and quantization methods, please refer to [vllm/model_executor/layers/quantization](../../../vllm/model_executor/layers/quantization) or consult with the vLLM development team.
+    获取最新的硬件支持与量化方法信息，请参考 [vllm/model_executor/layers/quantization](../../../vllm/model_executor/layers/quantization) 或联系 vLLM 开发团队

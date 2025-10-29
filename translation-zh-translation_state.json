@@ -1,0 +1,772 @@
+{
+  "docs/api/README.md": {
+    "source_hash": "d3a141f3273082a1c706977dc4d450b419409a8e",
+    "last_translated_at": "2025-10-29T01:39:13.471Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/bench/latency.md": {
+    "source_hash": "21ab13e63781a8976d9962954df5ccb512deaabe",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/bench/serve.md": {
+    "source_hash": "f7c415c6becb553158d89f1b282cbdda5ad98a2a",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/bench/throughput.md": {
+    "source_hash": "e4ff5ce43c9cee195620699cd0776b1327a9bd05",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/chat.md": {
+    "source_hash": "b006cb8de60d06aa83b44ff5550017578b924511",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/complete.md": {
+    "source_hash": "400359acf4fb8304105f54601f929d108d2249aa",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/json_tip.inc.md": {
+    "source_hash": "c22430c264c193dae01aa67ddddf38f1e78c7075",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/README.md": {
+    "source_hash": "c708eb795898097b69d5ec3c1fb686719adf62d2",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/run-batch.md": {
+    "source_hash": "f7d401b8dad2b5e35d3226b22348c6113f5e08da",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/cli/serve.md": {
+    "source_hash": "2c8f9d320f5df6db2f4e8d97b1a45ce4e04fe225",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/community/contact_us.md": {
+    "source_hash": "04c28cde5f6b06555e8d495766db322156a4d94b",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/community/meetups.md": {
+    "source_hash": "e821e2ac811491edeee33bc4db523f38cb74d50f",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/community/sponsors.md": {
+    "source_hash": "8abb07caaab62deb8b5b65c359d2b2a7a66e2287",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/conserving_memory.md": {
+    "source_hash": "5ce43c7984057e434cb0366a6640fba45306ae52",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/engine_args.md": {
+    "source_hash": "05d4f762306a37d397e23db94d97a0e7691dc64e",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/env_vars.md": {
+    "source_hash": "2c0a898754fa0ef294e23133fd742ab080d52727",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/model_resolution.md": {
+    "source_hash": "49576a8217d0a6f058a011ce5ef992d7802d0aac",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/optimization.md": {
+    "source_hash": "b0d390d7e1cbbff3372756e0568c08e3c44a048f",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/README.md": {
+    "source_hash": "85ae642ba6dd080a34af7e47c6efb4654d80b291",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/serve_args.md": {
+    "source_hash": "c1cc5577bc7abda32c44d85df510d40d8ceceb3c",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/configuration/tpu.md": {
+    "source_hash": "25d371e627b756a7c7d334985843f91ff55d5f43",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/ci/failures.md": {
+    "source_hash": "dad04e75fbb619f1096fd92f094d5fd0fd143ac5",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/ci/update_pytorch_version.md": {
+    "source_hash": "f983c25f26ee1673ee64dac704f1d7c328a556f0",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/dockerfile/dockerfile.md": {
+    "source_hash": "14184b96936613d878f0235da3e43d96530eb487",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/model/basic.md": {
+    "source_hash": "795bd5507a61333f7c3499ac9ab7e8fd2d362d87",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/model/multimodal.md": {
+    "source_hash": "4e74afc688cf797ab2272c3b682543d5f3aecbc3",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/model/README.md": {
+    "source_hash": "d8c40c5195735baadaf0adfc3dbacff7e8e462d5",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/model/registration.md": {
+    "source_hash": "400d0f75caca5cd07c95734895029410cd73334c",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/model/tests.md": {
+    "source_hash": "3ccd90cc66f773c1d718f8d28d293ad4d9cf1cb8",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/model/transcription.md": {
+    "source_hash": "a590ecd6a1a23b5890799e4d5b66d88682cee174",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/benchmarks.md": {
+    "source_hash": "e8b58dbbc93e6c4ea4aaf8bad9124ed148c55e60",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/deprecation_policy.md": {
+    "source_hash": "904ef4ca058c008e71b88b1ab12f9a9273e84186",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/incremental_build.md": {
+    "source_hash": "cc01a60ce1e7fd2cc4fceaf55775abf94daf732e",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/profiling.md": {
+    "source_hash": "fed286f4b6343ed382fff4e6c5558bb6399b19ef",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/README.md": {
+    "source_hash": "9c1b5a3b66d408874e64f640a034125aa2c89b6d",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/contributing/vulnerability_management.md": {
+    "source_hash": "847883f74297483700e14ba880f4106d7c2e7cff",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/anyscale.md": {
+    "source_hash": "965742ec072624a92a3756dc3663f3617a2686aa",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/anything-llm.md": {
+    "source_hash": "40a463a8a596c6c9718eea82f61028d8426b9b6e",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/autogen.md": {
+    "source_hash": "5790087ed5c2739fa4a7e7af19d2c7c26bb889dd",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/bentoml.md": {
+    "source_hash": "9c8f2527f2e2a7eb471421e30b146e9762ee7116",
+    "last_translated_at": "2025-10-29T01:39:13.472Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/cerebrium.md": {
+    "source_hash": "960347d9525c45ad08d84906689352fe7a364b5b",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/chatbox.md": {
+    "source_hash": "002935da560094b8f7ebed457bbf09872933b56b",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/dify.md": {
+    "source_hash": "820ef0cbed9fafc2fbe955fc5fdffc5922b22631",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/dstack.md": {
+    "source_hash": "9d2c7f5bb565fcb7a9a8feb96165a79205901a1a",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/haystack.md": {
+    "source_hash": "b53b829d6d3c0d6b63c911aaf05c1e785ae1b9d7",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/helm.md": {
+    "source_hash": "e5d44945ba725616e363c400ba61f695963f8149",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/hf_inference_endpoints.md": {
+    "source_hash": "d39bb9a899c8a76c5645ff2d42c38432ba76b04e",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/litellm.md": {
+    "source_hash": "9ea7c0373d2a1c6e0f7159a378e45c4c44d24ac9",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/lobe-chat.md": {
+    "source_hash": "8ecd1484eab066341b297e94acaf3884574fc83d",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/lws.md": {
+    "source_hash": "14710a8dc3334f7d24d48b57becf73246761f6a8",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/modal.md": {
+    "source_hash": "0ab5ed92fe6bd32801b07f85345d0e34782b1239",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/open-webui.md": {
+    "source_hash": "505c129613dea5a982c141e3eba5b45928a32fc0",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/retrieval_augmented_generation.md": {
+    "source_hash": "8a5d18807d06d46bf0a5d36f07a2186e69a31ee2",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/skypilot.md": {
+    "source_hash": "f4a984a6433e29b2543f36e593be549b766fa38d",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/streamlit.md": {
+    "source_hash": "1b214e1a32aab57ea10ceade20e3eab0d81b84e7",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/frameworks/triton.md": {
+    "source_hash": "faff4a4263eb20eaed370a83310263e05660d73c",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/kaito.md": {
+    "source_hash": "ff050d3eeaf475582ab91873a33756b685178ba5",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/kserve.md": {
+    "source_hash": "edf79fca4f93ecf68b44e787dec0ce0f0e2c6668",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/kubeai.md": {
+    "source_hash": "89d072215e956a158d344503466f1931db3e7141",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/kuberay.md": {
+    "source_hash": "1dcc98024e8dca640178bd68e48415cde35a2aad",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/llamastack.md": {
+    "source_hash": "8eb7f8d81275d2ea700bd58585ce7def8cd80d21",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/llmaz.md": {
+    "source_hash": "77730a26c24fc97362afc311428039cde3949643",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/integrations/production-stack.md": {
+    "source_hash": "2f1894ccf0022a835fbc02b80fda79b97a73df17",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/docker.md": {
+    "source_hash": "1c639f3533d47938fd400bd0e24f5c81d4dc51cc",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/k8s.md": {
+    "source_hash": "54031ec368b5c035eeecba0ef0ef7215b345fbcd",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/deployment/nginx.md": {
+    "source_hash": "034068cddac3966f70e00e8946c35d579ba7d1d9",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/arch_overview.md": {
+    "source_hash": "b67b084a851a82bdce71eb101baad33e2428cd33",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/cuda_graphs.md": {
+    "source_hash": "b56cf61e782c418e42ee0a0120ae629148a406fe",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/dbo.md": {
+    "source_hash": "f2d98ccd063fa38f5146b709b320d897a95ef6cf",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/fused_moe_modular_kernel.md": {
+    "source_hash": "76df0d8d8a38f08bde9db51a920ba6ae4511037d",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/huggingface_integration.md": {
+    "source_hash": "412ce658b92a297469374f7edd11e69070a2a62b",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/hybrid_kv_cache_manager.md": {
+    "source_hash": "8f17b473adc085729f781410cf5aed4c9a364535",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/io_processor_plugins.md": {
+    "source_hash": "fb64a7bb9c8f191b91f49938843e43da0473e5f7",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/logits_processors.md": {
+    "source_hash": "da61d2a85e46608231ff03d8757db9b2a8be812a",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/metrics.md": {
+    "source_hash": "313c9aaebd26bb2100c9faa88727a47fecbbfcb0",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/mm_processing.md": {
+    "source_hash": "ee56ac5b98ef338a0adb0d6c44063e46131818ed",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/moe_kernel_features.md": {
+    "source_hash": "633e23eea33e250040071b80a5fdc306d0b27629",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/multiprocessing.md": {
+    "source_hash": "d6bd922788294a63a3ebe9365a052ef726b69747",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/p2p_nccl_connector.md": {
+    "source_hash": "4674bef8d2b64ce90a17666b71857f20a7f329b8",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/paged_attention.md": {
+    "source_hash": "d87b2a639df1260f9dcf9e10f62d9a75452afbbd",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/plugin_system.md": {
+    "source_hash": "dc2f7c4aed3c3ab5ba135a0a63b0610ed863e3de",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/prefix_caching.md": {
+    "source_hash": "bd4070f381d8164b2f8efb8ca9e67ff1b20c0792",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/design/torch_compile.md": {
+    "source_hash": "5a3ca2de82194489eb907650dc19a843c2006823",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/examples/README.md": {
+    "source_hash": "94f5efc92f3864fa37b021ca97484e78c18428e8",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/auto_awq.md": {
+    "source_hash": "e77e8b5a1f4152c81e27abffb4d0ec6a10cefb71",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/auto_round.md": {
+    "source_hash": "9c14f362b663fd9159085525e59308a1b36c0c77",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/bitblas.md": {
+    "source_hash": "c3a127657622356cbd48dfb4854b36c5cc418719",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/bnb.md": {
+    "source_hash": "2348c7739c066c4074da4a308e9357de0498f4bb",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/fp8.md": {
+    "source_hash": "0c5111fb8af0de7be16cdf34c1e28e16ea0b6128",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/gguf.md": {
+    "source_hash": "2a731e9b7e0329ca3cee5335a0624313a893e8ee",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/gptqmodel.md": {
+    "source_hash": "f14a931725da498559ee340612ddabd3b26e1ce9",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/inc.md": {
+    "source_hash": "5e86e9388f328be3f733d0b4ec815ae9dad255c3",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/int4.md": {
+    "source_hash": "035e7ea291f9e07fbc86d020250069444339d040",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/int8.md": {
+    "source_hash": "ec8a77f74ffef2ebc03170c0c7dc56561c056b18",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/modelopt.md": {
+    "source_hash": "c48ccb719a79d703cabd024b7eb2c7b025df157e",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/quantized_kvcache.md": {
+    "source_hash": "56cf057678be61950f03a266577be708c5dea712",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/quark.md": {
+    "source_hash": "385e3bbb8712f5802d2f9763f8e6aafb1dc8ebb7",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/README.md": {
+    "source_hash": "74f005c496ee53b1cbc7026fcffa17399981ad8d",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/quantization/torchao.md": {
+    "source_hash": "b95b560882bb12b1f39e11c8e1f1dedd40bbfd0b",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/automatic_prefix_caching.md": {
+    "source_hash": "3718a4b74eb26bae23d869d32a2a414a791ba62a",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/custom_arguments.md": {
+    "source_hash": "74ed40835b4d4fa623f8520986e9ad51679b95b0",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/custom_logitsprocs.md": {
+    "source_hash": "b8ad53863cd7afe0120f459e8bf05016e2c11460",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/disagg_prefill.md": {
+    "source_hash": "3e8cb87e37d33ee54dfd428a81f6fe18a1171283",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/lora.md": {
+    "source_hash": "3a85b52d89b688705137efdec1724eb1460004e0",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/multimodal_inputs.md": {
+    "source_hash": "caf458c24497c2dc1e6af543045f48d6dfac6714",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/nixl_connector_usage.md": {
+    "source_hash": "605398652ee0b2e217c2a1af183c3ad8e44b1fa7",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/prompt_embeds.md": {
+    "source_hash": "b81d2f28e3b9debdfbd98c3368441932f971e978",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/README.md": {
+    "source_hash": "ad9de9ff8f368c62922c4c424312c7b088bb162e",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/reasoning_outputs.md": {
+    "source_hash": "dc2b2315182a979430e18b12e43addaaf665531c",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/sleep_mode.md": {
+    "source_hash": "e7dd9fee12d37876a212e44c7d28102c96e369a2",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/spec_decode.md": {
+    "source_hash": "ab72c7d97b7a43e8e8de6aca9ed9f840e4e6b0f4",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/structured_outputs.md": {
+    "source_hash": "9e1da37ca962d4a70499a8d44f9d36b25240376f",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/features/tool_calling.md": {
+    "source_hash": "7a1b30096a56df0e6e0f30fd8513cbdc23ad39d4",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/cpu.apple.inc.md": {
+    "source_hash": "7e2ed55008a57786b4c1200d005ff50f414fba8e",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/cpu.arm.inc.md": {
+    "source_hash": "9cae9ed1a212e0f1f04f428c40bc2023328c5e9c",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/cpu.md": {
+    "source_hash": "747035d38e3b08bb399dfdb26a82b3b0e40caf72",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/cpu.s390x.inc.md": {
+    "source_hash": "442c2b4ec64e8b02bce3736eb6b52bb032e63b38",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/cpu.x86.inc.md": {
+    "source_hash": "00f3b726b1a0eb48ae820bf196ca95f1efb3bc40",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/device.template.md": {
+    "source_hash": "44f538da936595ec687d745a4366a98f2d85456d",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/google_tpu.md": {
+    "source_hash": "0f8c5bccd4b95b4a276d22ca9d7cefcd636edbce",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/gpu.cuda.inc.md": {
+    "source_hash": "b2d0d64a2d35555320ca0627f8cb60b8ebd65c1c",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/gpu.md": {
+    "source_hash": "bc7508b29475f180c4dfbe116111598f2ccc5cd2",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/gpu.rocm.inc.md": {
+    "source_hash": "f546e0f0e505244695a89c1a118838ad6b46ceab",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/gpu.xpu.inc.md": {
+    "source_hash": "9156df9db6df30c2f0a71cb13888061dcc3e569c",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/python_env_setup.inc.md": {
+    "source_hash": "ba78c329723edeb7b44f04694b6f8551648020cd",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/installation/README.md": {
+    "source_hash": "a4e63e426b9ba348fb554e3bb426fc8f9ecc70b1",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/getting_started/quickstart.md": {
+    "source_hash": "70a91b7454ceb470373a132166731db7e7123345",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/extensions/fastsafetensor.md": {
+    "source_hash": "0f30d4e2f69d267302f3b5d1da6419245842c85a",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/extensions/runai_model_streamer.md": {
+    "source_hash": "c2cf107263a038c05ee4910d175cdf677d539e32",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/extensions/tensorizer.md": {
+    "source_hash": "3df80d5af6c4dd53fa6dd8d1795e8db9daf1cad4",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/hardware_supported_models/tpu.md": {
+    "source_hash": "7b0a5ba6e72da243e3f893281784a49ba7a5a420",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/generative_models.md": {
+    "source_hash": "be2f25bf06616d1607b2fecacf2d17c3132ed655",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/pooling_models.md": {
+    "source_hash": "40651be1d449581a461432854680b6cea0bdf719",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/models/supported_models.md": {
+    "source_hash": "4d50c809d1966d8ecb4f89dfc5c87c8709b47d76",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/integrations/langchain.md": {
+    "source_hash": "192a61ea5b903aa165af3340cd8a9d7cf108041b",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/integrations/llamaindex.md": {
+    "source_hash": "4b838cbcaa9d156d00ea4c8c436340c99f274e50",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/context_parallel_deployment.md": {
+    "source_hash": "dacdf312ee55bf1c1081bccdd2ac4e079cef11d8",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/data_parallel_deployment.md": {
+    "source_hash": "eff9c5d5e4efa1397eb43edcab540c8b6e7da58f",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/distributed_troubleshooting.md": {
+    "source_hash": "b5354a7e55d5c4adb15cdbab99d23139337e22fc",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/expert_parallel_deployment.md": {
+    "source_hash": "ec07896592ba38797712fbb7586808081597fb0f",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/offline_inference.md": {
+    "source_hash": "b3d211871821008db4685e10327c71bce86d1a49",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/openai_compatible_server.md": {
+    "source_hash": "1414718a697d5f9e4c8bf5442257a8e631065e25",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/serving/parallelism_scaling.md": {
+    "source_hash": "14cd3b057791cfe5e1299adfc7ba0501a41d6acc",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/training/rlhf.md": {
+    "source_hash": "0b7e384dc8d6a5cde7e8fdb0b4ba1470b4eb9cea",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/training/trl.md": {
+    "source_hash": "acf48cc4ecb33f03742aaa4d85851c744b9e966a",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/faq.md": {
+    "source_hash": "2c8680cb6f7b59c4ff201a22cf51fc949118e4da",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/metrics.md": {
+    "source_hash": "d756e32476f0a06a9e519313233a1662b8ecc6b2",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/README.md": {
+    "source_hash": "0c63d01f0f99fbbf9b2533149b77014a167601a3",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/reproducibility.md": {
+    "source_hash": "d8a1943209c1ee1602c16c02bc8e88f1fb7ddcb1",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/security.md": {
+    "source_hash": "9d10b66a5a97f2ce28e2e4b55d09084a57ec1180",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/troubleshooting.md": {
+    "source_hash": "94e801376e531e136981ef80875a8ad921c244fe",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/usage_stats.md": {
+    "source_hash": "6225478d52d00e45a9b3c96b3287afd0af61a983",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/usage/v1_guide.md": {
+    "source_hash": "c47547cb0ea7af15846beaadaa26dc0a4e921718",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  },
+  "docs/README.md": {
+    "source_hash": "ae95717def4cd81f37005601bfecdb7c80461cf1",
+    "last_translated_at": "2025-10-29T02:11:41.878Z",
+    "translator_version": "1.0"
+  }
+}

@@ -1,9 +1,9 @@
-# Configuration Options
+# 配置选项
 
-This section lists the most common options for running vLLM.
+本节列出了运行 vLLM 时最常用的一些选项。
 
-There are three main levels of configuration, from highest priority to lowest priority:
+配置主要分为三个层级，优先级从高到低依次为：
 
-- [Request parameters](../serving/openai_compatible_server.md#completions-api) and [input arguments](../api/README.md#inference-parameters)
-- [Engine arguments](./engine_args.md)
-- [Environment variables](./env_vars.md)
+- [请求参数](../serving/openai_compatible_server.md#completions-api) 和 [输入参数](../api/README.md#inference-parameters)
+- [引擎参数](./engine_args.md)
+- [环境变量](./env_vars.md)

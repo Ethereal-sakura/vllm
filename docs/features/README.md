@@ -1,20 +1,20 @@
-# Features
+# 功能特性
 
-## Compatibility Matrix
+## 兼容性矩阵
 
-The tables below show mutually exclusive features and the support on some hardware.
+以下表格展示了部分硬件平台上，功能之间的互斥关系及支持情况。
 
-The symbols used have the following meanings:
+各符号含义如下：
 
-- ✅ = Full compatibility
-- 🟠 = Partial compatibility
-- ❌ = No compatibility
-- ❔ = Unknown or TBD
+- ✅ = 完全兼容
+- 🟠 = 部分兼容
+- ❌ = 不兼容
+- ❔ = 未知或待补充
 
 !!! note
-    Check the ❌ or 🟠 with links to see tracking issue for unsupported feature/hardware combination.
+    带有 ❌ 或 🟠 并附带链接的格子，点击可查看对应功能与硬件组合的不支持追踪问题。
 
-### Feature x Feature
+### 功能 x 功能
 
 <style>
 td:not(:first-child) {
@@ -36,7 +36,7 @@ th:not(:first-child) {
 }
 </style>
 
-| Feature | [CP](../configuration/optimization.md#chunked-prefill) | [APC](automatic_prefix_caching.md) | [LoRA](lora.md) | [SD](spec_decode.md) | CUDA graph | [pooling](../models/pooling_models.md) | <abbr title="Encoder-Decoder Models">enc-dec</abbr> | <abbr title="Logprobs">logP</abbr> | <abbr title="Prompt Logprobs">prmpt logP</abbr> | <abbr title="Async Output Processing">async output</abbr> | multi-step | <abbr title="Multimodal Inputs">mm</abbr> | best-of | beam-search | [prompt-embeds](prompt_embeds.md) |
+| 功能 | [CP](../configuration/optimization.md#chunked-prefill) | [APC](automatic_prefix_caching.md) | [LoRA](lora.md) | [SD](spec_decode.md) | CUDA graph | [pooling](../models/pooling_models.md) | <abbr title="Encoder-Decoder Models">enc-dec</abbr> | <abbr title="Logprobs">logP</abbr> | <abbr title="Prompt Logprobs">prmpt logP</abbr> | <abbr title="Async Output Processing">async output</abbr> | multi-step | <abbr title="Multimodal Inputs">mm</abbr> | best-of | beam-search | [prompt-embeds](prompt_embeds.md) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [CP](../configuration/optimization.md#chunked-prefill) | ✅ | | | | | | | | | | | | | | |
 | [APC](automatic_prefix_caching.md) | ✅ | ✅ | | | | | | | | | | | | | |
@@ -54,25 +54,25 @@ th:not(:first-child) {
 | beam-search | ✅ | ✅ | ✅ | [❌](https://github.com/vllm-project/vllm/issues/6137) | ✅ | ❌ | ✅ | ✅ | ✅ | ❔ | [❌](https://github.com/vllm-project/vllm/issues/7968) | ❔ | ✅ | ✅ | |
 | [prompt-embeds](prompt_embeds.md) | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❔ | ❔ | ❌ | ❔ | ❔ | ✅ |
 
-\* Chunked prefill and prefix caching are only applicable to last-token pooling.  
-<sup>^</sup> LoRA is only applicable to the language backbone of multimodal models.
+\* 分块预填（chunked prefill）和前缀缓存（prefix caching）仅支持最后一个 token 的池化。  
+<sup>^</sup> LoRA 仅适用于多模态模型的语言主干部分。
 
-### Feature x Hardware
+### 功能 x 硬件
 
-| Feature                                                   | Volta               | Turing    | Ampere    | Ada    | Hopper     | CPU                | AMD    | TPU | Intel GPU |
-|-----------------------------------------------------------|---------------------|-----------|-----------|--------|------------|--------------------|--------|-----| ------------|
-| [CP](../configuration/optimization.md#chunked-prefill)                                     | [❌](https://github.com/vllm-project/vllm/issues/2729) | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ✅ | ✅        |
-| [APC](automatic_prefix_caching.md)                        | [❌](https://github.com/vllm-project/vllm/issues/3687) | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ✅ | ✅        |
-| [LoRA](lora.md)                                           | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ✅ | ✅        |
-| [SD](spec_decode.md)                                      | ✅                  | ✅        | ✅        | ✅     | ✅        | ❌                  | ✅     | ❌ | [🟠](https://github.com/vllm-project/vllm/issues/26963)       |
-| CUDA graph                                                | ✅                  | ✅        | ✅        | ✅     | ✅        | ❌                  | ✅     | ❌ | [❌](https://github.com/vllm-project/vllm/issues/26970)        |
-| [pooling](../models/pooling_models.md)                    | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
-| <abbr title="Encoder-Decoder Models">enc-dec</abbr>       | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ❌     | ❌ | ✅        |
-| [mm](multimodal_inputs.md)                                | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | [🟠](https://github.com/vllm-project/vllm/issues/26965)       |
-| <abbr title="Logprobs">logP</abbr>                        | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
-| <abbr title="Prompt Logprobs">prmpt logP</abbr>           | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
+| 功能                                                   | Volta               | Turing    | Ampere    | Ada    | Hopper     | CPU                | AMD    | TPU | Intel GPU |
+|--------------------------------------------------------|---------------------|-----------|-----------|--------|------------|--------------------|--------|-----| ------------|
+| [CP](../configuration/optimization.md#chunked-prefill) | [❌](https://github.com/vllm-project/vllm/issues/2729) | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ✅ | ✅        |
+| [APC](automatic_prefix_caching.md)                     | [❌](https://github.com/vllm-project/vllm/issues/3687) | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ✅ | ✅        |
+| [LoRA](lora.md)                                        | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ✅ | ✅        |
+| [SD](spec_decode.md)                                   | ✅                  | ✅        | ✅        | ✅     | ✅        | ❌                  | ✅     | ❌ | [🟠](https://github.com/vllm-project/vllm/issues/26963)       |
+| CUDA graph                                             | ✅                  | ✅        | ✅        | ✅     | ✅        | ❌                  | ✅     | ❌ | [❌](https://github.com/vllm-project/vllm/issues/26970)        |
+| [pooling](../models/pooling_models.md)                 | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
+| <abbr title="Encoder-Decoder Models">enc-dec</abbr>    | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ❌     | ❌ | ✅        |
+| [mm](multimodal_inputs.md)                             | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | [🟠](https://github.com/vllm-project/vllm/issues/26965)       |
+| <abbr title="Logprobs">logP</abbr>                     | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
+| <abbr title="Prompt Logprobs">prmpt logP</abbr>        | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
 | <abbr title="Async Output Processing">async output</abbr> | ✅                  | ✅        | ✅        | ✅     | ✅        | ❌                  | ❌     | ❌ | ✅        |
-| multi-step                                                | ✅                  | ✅        | ✅        | ✅     | ✅        | [❌](https://github.com/vllm-project/vllm/issues/8477) | ✅     | ❌ | ✅        |
-| best-of                                                   | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
-| beam-search                                               | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
-| [prompt-embeds](prompt_embeds.md)                         | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ❔     | [❌](https://github.com/vllm-project/vllm/issues/25097) | ✅       |
+| multi-step                                             | ✅                  | ✅        | ✅        | ✅     | ✅        | [❌](https://github.com/vllm-project/vllm/issues/8477) | ✅     | ❌ | ✅        |
+| best-of                                                | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
+| beam-search                                            | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ✅     | ❌ | ✅        |
+| [prompt-embeds](prompt_embeds.md)                      | ✅                  | ✅        | ✅        | ✅     | ✅        | ✅                  | ❔     | [❌](https://github.com/vllm-project/vllm/issues/25097) | ✅       |

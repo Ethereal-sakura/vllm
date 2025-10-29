@@ -1,18 +1,18 @@
 # --8<-- [start:installation]
 
-vLLM has experimental support for macOS with Apple Silicon. For now, users must build from source to natively run on macOS.
+vLLM 目前在搭载 Apple Silicon 的 macOS 上提供了实验性支持。现在，用户需要从源码自行编译，才能在 macOS 上原生运行。
 
-Currently the CPU implementation for macOS supports FP32 and FP16 datatypes.
+目前 macOS 平台上的 CPU 实现支持 FP32 和 FP16 两种数据类型。
 
 !!! warning
-    There are no pre-built wheels or images for this device, so you must build vLLM from source.
+    目前没有适用于该设备的预编译轮子（wheels）或镜像（images），你必须从源码编译 vLLM。
 
 # --8<-- [end:installation]
 # --8<-- [start:requirements]
 
-- OS: `macOS Sonoma` or later
-- SDK: `XCode 15.4` or later with Command Line Tools
-- Compiler: `Apple Clang >= 15.0.0`
+- 操作系统：`macOS Sonoma` 或更高版本
+- SDK：需安装带命令行工具的 `XCode 15.4` 或更高版本
+- 编译器：`Apple Clang >= 15.0.0`
 
 # --8<-- [end:requirements]
 # --8<-- [start:set-up-using-python]
@@ -23,7 +23,7 @@ Currently the CPU implementation for macOS supports FP32 and FP16 datatypes.
 # --8<-- [end:pre-built-wheels]
 # --8<-- [start:build-wheel-from-source]
 
-After installation of XCode and the Command Line Tools, which include Apple Clang, execute the following commands to build and install vLLM from source.
+在安装好 XCode 及其命令行工具（包含 Apple Clang）后，请依次执行以下命令，从源码编译并安装 vLLM。
 
 ```bash
 git clone https://github.com/vllm-project/vllm.git
@@ -33,11 +33,11 @@ uv pip install -e .
 ```
 
 !!! note
-    On macOS the `VLLM_TARGET_DEVICE` is automatically set to `cpu`, which is currently the only supported device.
+    在 macOS 上，`VLLM_TARGET_DEVICE` 会自动设置为 `cpu`，目前仅支持该设备。
 
-!!! example "Troubleshooting"
-    If the build fails with errors like the following where standard C++ headers cannot be found, try to remove and reinstall your
-    [Command Line Tools for Xcode](https://developer.apple.com/download/all/).
+!!! example "故障排查"
+    如果编译时遇到如下错误，提示无法找到标准 C++ 头文件，可以尝试卸载并重新安装
+    [Xcode 命令行工具](https://developer.apple.com/download/all/)。
 
     ```text
     [...] fatal error: 'map' file not found
@@ -54,7 +54,7 @@ uv pip install -e .
 
     ---
 
-    If the build fails with C++11/C++17 compatibility errors like the following, the issue is that the build system is defaulting to an older C++ standard:
+    如果编译失败，出现类似 C++11/C++17 兼容性错误，如下所示，说明构建系统默认使用了较老的 C++ 标准：
 
     ```text
     [...] error: 'constexpr' is not a type
@@ -62,13 +62,13 @@ uv pip install -e .
     [...] error: 'constexpr' does not name a type
     ```
 
-    **Solution**: Your compiler might be using an older C++ standard. Edit `cmake/cpu_extension.cmake` and add `set(CMAKE_CXX_STANDARD 17)` before `set(CMAKE_CXX_STANDARD_REQUIRED ON)`.
+    **解决方法**：你的编译器可能正在使用较老的 C++ 标准。请编辑 `cmake/cpu_extension.cmake`，在 `set(CMAKE_CXX_STANDARD_REQUIRED ON)` 之前添加一行 `set(CMAKE_CXX_STANDARD 17)`。
 
-    To check your compiler's C++ standard support:
+    检查编译器 C++ 标准支持的方法如下：
     ```bash
     clang++ -std=c++17 -pedantic -dM -E -x c++ /dev/null | grep __cplusplus
     ```
-    On Apple Clang 16 you should see: `#define __cplusplus 201703L`
+    在 Apple Clang 16 上应该看到：`#define __cplusplus 201703L`
 
 # --8<-- [end:build-wheel-from-source]
 # --8<-- [start:pre-built-images]

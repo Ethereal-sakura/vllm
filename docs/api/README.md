@@ -1,8 +1,8 @@
-# Summary
+# 概览
 
-## Configuration
+## 配置
 
-API documentation for vLLM's configuration classes.
+vLLM 配置类的 API 文档。
 
 - [vllm.config.ModelConfig][]
 - [vllm.config.CacheConfig][]
@@ -20,50 +20,49 @@ API documentation for vLLM's configuration classes.
 - [vllm.config.CompilationConfig][]
 - [vllm.config.VllmConfig][]
 
-## Offline Inference
+## 离线推理
 
-LLM Class.
+LLM 类。
 
 - [vllm.LLM][]
 
-LLM Inputs.
+LLM 输入。
 
 - [vllm.inputs.PromptType][]
 - [vllm.inputs.TextPrompt][]
 - [vllm.inputs.TokensPrompt][]
 
-## vLLM Engines
+## vLLM 推理引擎
 
-Engine classes for offline and online inference.
+用于离线和在线推理的引擎类。
 
 - [vllm.LLMEngine][]
 - [vllm.AsyncLLMEngine][]
 
-## Inference Parameters
+## 推理参数
 
-Inference parameters for vLLM APIs.
+vLLM API 的推理参数。
 
 - [vllm.SamplingParams][]
 - [vllm.PoolingParams][]
 
-## Multi-Modality
+## 多模态
 
-vLLM provides experimental support for multi-modal models through the [vllm.multimodal][] package.
+vLLM 通过 [vllm.multimodal][] 包提供了对多模态模型的实验性支持。
 
-Multi-modal inputs can be passed alongside text and token prompts to [supported models](../models/supported_models.md#list-of-multimodal-language-models)
-via the `multi_modal_data` field in [vllm.inputs.PromptType][].
+除了文本和 token 提示外，还可以通过 [vllm.inputs.PromptType][] 的 `multi_modal_data` 字段向[支持的模型](../models/supported_models.md#list-of-multimodal-language-models)传递多模态输入。
 
-Looking to add your own multi-modal model? Please follow the instructions listed [here](../contributing/model/multimodal.md).
+想要添加自定义的多模态模型？请参考[这里的说明](../contributing/model/multimodal.md)。
 
 - [vllm.multimodal.MULTIMODAL_REGISTRY][]
 
-### Inputs
+### 输入接口
 
-User-facing inputs.
+面向用户的输入数据。
 
 - [vllm.multimodal.inputs.MultiModalDataDict][]
 
-Internal data structures.
+内部数据结构。
 
 - [vllm.multimodal.inputs.PlaceholderRange][]
 - [vllm.multimodal.inputs.NestedTensors][]
@@ -74,23 +73,23 @@ Internal data structures.
 - [vllm.multimodal.inputs.MultiModalKwargs][]
 - [vllm.multimodal.inputs.MultiModalInputs][]
 
-### Data Parsing
+### 数据解析
 
 - [vllm.multimodal.parse][]
 
-### Data Processing
+### 数据处理
 
 - [vllm.multimodal.processing][]
 
-### Memory Profiling
+### 内存分析
 
 - [vllm.multimodal.profiling][]
 
-### Registry
+### 注册表
 
 - [vllm.multimodal.registry][]
 
-## Model Development
+## 模型开发
 
 - [vllm.model_executor.models.interfaces_base][]
 - [vllm.model_executor.models.interfaces][]

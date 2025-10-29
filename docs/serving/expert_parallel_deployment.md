@@ -1,141 +1,141 @@
-# Expert Parallel Deployment
+# 专家并行部署
 
-vLLM supports Expert Parallelism (EP), which allows experts in Mixture-of-Experts (MoE) models to be deployed on separate GPUs, increasing locality, efficiency, and throughput overall.
+vLLM 支持专家并行（Expert Parallelism，EP），这允许混合专家（Mixture-of-Experts，MoE）模型中的各个专家分别部署在不同的 GPU 上，从而提升局部性、运行效率和整体吞吐量。
 
-EP is typically coupled with Data Parallelism (DP). While DP can be used independently of EP, EP is more efficient when used in conjunction with DP. You can read more about data parallelism [here](data_parallel_deployment.md).
+EP 通常会与数据并行（Data Parallelism，DP）结合使用。虽然 DP 可以单独启用，但与 DP 配合时 EP 的性能表现更佳。你可以在[这里](data_parallel_deployment.md)了解更多关于数据并行的信息。
 
-## Prerequisites
+## 前置条件
 
-Before using EP, you need to install the necessary dependencies. We are actively working on making this easier in the future:
+在使用 EP 前，需要安装相关依赖。我们正在持续优化安装流程，未来会更加便捷：
 
-1. **Install DeepEP and pplx-kernels**: Set up host environment following vLLM's guide for EP kernels [here](../../tools/ep_kernels).
-2. **Install DeepGEMM library**: Follow the [official instructions](https://github.com/deepseek-ai/DeepGEMM#installation).
-3. **For disaggregated serving**: Install `gdrcopy` by running the [`install_gdrcopy.sh`](../../tools/install_gdrcopy.sh) script (e.g., `install_gdrcopy.sh "${GDRCOPY_OS_VERSION}" "12.8" "x64"`). You can find available OS versions [here](https://developer.download.nvidia.com/compute/redist/gdrcopy/CUDA%2012.8/).
+1. **安装 DeepEP 和 pplx-kernels**：请按照 vLLM 的 EP kernels 指南设置主机环境，具体见[这里](../../tools/ep_kernels)。
+2. **安装 DeepGEMM 库**：请参考[官方说明](https://github.com/deepseek-ai/DeepGEMM#installation)进行安装。
+3. **分离式服务场景**：运行 [`install_gdrcopy.sh`](../../tools/install_gdrcopy.sh) 脚本安装 `gdrcopy`（例如 `install_gdrcopy.sh "${GDRCOPY_OS_VERSION}" "12.8" "x64"`）。可用操作系统版本见[这里](https://developer.download.nvidia.com/compute/redist/gdrcopy/CUDA%2012.8/)。
 
-### Backend Selection Guide
+### 通信后端选择指南
 
-vLLM provides multiple communication backends for EP. Use `--all2all-backend` to select one:
+vLLM 为 EP 提供了多种通信后端。通过 `--all2all-backend` 参数进行选择：
 
-| Backend | Use Case | Features | Best For |
+| 后端 | 适用场景 | 主要特点 | 推荐用途 |
 |---------|----------|----------|----------|
-| `allgather_reducescatter` | Default backend | Standard all2all using allgather/reducescatter primitives | General purpose, works with any EP+DP configuration |
-| `pplx` | Single node | Chunked prefill support, efficient intra-node communication | Single-node deployments, development |
-| `deepep_high_throughput` | Multi-node prefill | Grouped GEMM with continuous layout, optimized for prefill | Prefill-dominated workloads, high-throughput scenarios |
-| `deepep_low_latency` | Multi-node decode | CUDA graph support, masked layout, optimized for decode | Decode-dominated workloads, low-latency scenarios |
-| `flashinfer_all2allv` | MNNVL systems | FlashInfer alltoallv kernels for multi-node NVLink | Systems with NVLink across nodes |
-| `naive` | Testing/debugging | Simple broadcast-based implementation | Debugging, not recommended for production |
+| `allgather_reducescatter` | 默认后端 | 标准 all2all，使用 allgather/reducescatter 原语 | 通用，适合任何 EP+DP 配置 |
+| `pplx` | 单节点 | 支持分块 prefill，高效节点内通信 | 单节点部署、开发测试 |
+| `deepep_high_throughput` | 多节点 prefill | 分组 GEMM、连续布局，prefill 性能优化 | Prefill 密集型、高吞吐场景 |
+| `deepep_low_latency` | 多节点 decode | 支持 CUDA 图、掩码布局，decode 性能优化 | Decode 密集型、低延迟场景 |
+| `flashinfer_all2allv` | MNNVL 系统 | FlashInfer alltoallv 内核，适用于多节点 NVLink | 跨节点 NVLink 系统 |
+| `naive` | 测试/调试 | 简单的广播实现 | 仅限调试，不建议生产使用 |
 
-## Single Node Deployment
+## 单节点部署
 
 !!! warning
-    EP is an experimental feature. Argument names and default values may change in the future.
+    EP 目前仍为实验性功能，参数命名与默认值未来可能会有所调整。
 
-### Configuration
+### 配置方式
 
-Enable EP by setting the `--enable-expert-parallel` flag. The EP size is automatically calculated as:
+启用 EP，只需添加 `--enable-expert-parallel` 参数。EP 的规模会自动计算：
 
 ```text
 EP_SIZE = TP_SIZE × DP_SIZE
 ```
 
-Where:
+其中：
 
-- `TP_SIZE`: Tensor parallel size (always 1 for now)
-- `DP_SIZE`: Data parallel size
-- `EP_SIZE`: Expert parallel size (computed automatically)
+- `TP_SIZE`：张量并行规模（目前始终为 1）
+- `DP_SIZE`：数据并行规模
+- `EP_SIZE`：专家并行规模（自动计算）
 
-### Example Command
+### 命令示例
 
-The following command serves a `DeepSeek-V3-0324` model with 1-way tensor parallel, 8-way (attention) data parallel, and 8-way expert parallel. The attention weights are replicated across all GPUs, while the expert weights are split across GPUs. It will work on a H200 (or H20) node with 8 GPUs. For H100, you can try to serve a smaller model or refer to the multi-node deployment section.
-
-```bash
-# Single node EP deployment with pplx backend
-vllm serve deepseek-ai/DeepSeek-V3-0324 \
-    --tensor-parallel-size 1 \       # Tensor parallelism across 1 GPU
-    --data-parallel-size 8 \         # Data parallelism across 8 processes
-    --enable-expert-parallel \       # Enable expert parallelism
-    --all2all-backend pplx           # Use pplx communication backend
-```
-
-## Multi-Node Deployment
-
-For multi-node deployment, use the DeepEP communication kernel with one of two modes (see [Backend Selection Guide](#backend-selection-guide) above).
-
-### Deployment Steps
-
-1. **Run one command per node** - Each node requires its own launch command
-2. **Configure networking** - Ensure proper IP addresses and port configurations
-3. **Set node roles** - First node handles requests, additional nodes run in headless mode
-
-### Example: 2-Node Deployment
-
-The following example deploys `DeepSeek-V3-0324` across 2 nodes using `deepep_low_latency` mode:
+下面的命令用于部署 `DeepSeek-V3-0324` 模型，采用 1 路张量并行、8 路（注意力）数据并行和 8 路专家并行。注意力权重会在所有 GPU 上复制，专家权重则在 GPU 间分割。适用于 H200（或 H20）节点（8 卡），如果是 H100，可选较小模型或参考多节点部署方式。
 
 ```bash
-# Node 1 (Primary - handles incoming requests)
+# 单节点 EP 部署，使用 pplx 后端
 vllm serve deepseek-ai/DeepSeek-V3-0324 \
-    --all2all-backend deepep_low_latency \
-    --tensor-parallel-size 1 \               # TP size per node
-    --enable-expert-parallel \               # Enable EP
-    --data-parallel-size 16 \                # Total DP size across all nodes
-    --data-parallel-size-local 8 \           # Local DP size on this node (8 GPUs per node)
-    --data-parallel-address 192.168.1.100 \  # Replace with actual IP of Node 1
-    --data-parallel-rpc-port 13345 \         # RPC communication port, can be any port as long as reachable by all nodes
-    --api-server-count=8                     # Number of API servers for load handling (scaling this out to total ranks are recommended)
-
-# Node 2 (Secondary - headless mode, no API server)
-vllm serve deepseek-ai/DeepSeek-V3-0324 \
-    --all2all-backend deepep_low_latency \
-    --tensor-parallel-size 1 \               # TP size per node
-    --enable-expert-parallel \               # Enable EP
-    --data-parallel-size 16 \                # Total DP size across all nodes
-    --data-parallel-size-local 8 \           # Local DP size on this node
-    --data-parallel-start-rank 8 \           # Starting rank offset for this node
-    --data-parallel-address 192.168.1.100 \  # IP of primary node (Node 1)
-    --data-parallel-rpc-port 13345 \         # Same RPC port as primary
-    --headless                               # No API server, worker only
+    --tensor-parallel-size 1 \       # 张量并行（1 卡）
+    --data-parallel-size 8 \         # 数据并行（8 进程）
+    --enable-expert-parallel \       # 启用专家并行
+    --all2all-backend pplx           # 使用 pplx 通信后端
 ```
 
-### Key Configuration Notes
+## 多节点部署
 
-- **Headless mode**: Secondary nodes run with `--headless` flag, meaning all client requests are handled by the primary node
-- **Rank calculation**: `--data-parallel-start-rank` should equal the cumulative local DP size of previous nodes
-- **Load scaling**: Adjust `--api-server-count` on the primary node to handle higher request loads
+多节点部署时，需使用 DeepEP 通信内核，并选择两种模式之一（参见前文[通信后端选择指南](#backend-selection-guide)）。
 
-### Network Configuration
+### 部署步骤
 
-!!! important "InfiniBand Clusters"
-    On InfiniBand networked clusters, set this environment variable to prevent initialization hangs:
+1. **每个节点都需单独启动** - 每个节点运行独立的启动命令
+2. **设置网络参数** - 确保 IP 地址与端口配置正确
+3. **指定节点角色** - 首个节点处理请求，其余节点以 headless 模式运行
+
+### 示例：2 节点部署
+
+以下示例展示如何通过 `deepep_low_latency` 模式，将 `DeepSeek-V3-0324` 部署在 2 个节点上：
+
+```bash
+# 节点 1（主节点，负责请求处理）
+vllm serve deepseek-ai/DeepSeek-V3-0324 \
+    --all2all-backend deepep_low_latency \
+    --tensor-parallel-size 1 \               # 每节点 TP 规模
+    --enable-expert-parallel \               # 启用专家并行
+    --data-parallel-size 16 \                # 总 DP 规模（所有节点之和）
+    --data-parallel-size-local 8 \           # 本节点 DP 规模（8 卡/节点）
+    --data-parallel-address 192.168.1.100 \  # 实际主节点 IP
+    --data-parallel-rpc-port 13345 \         # 通信端口，需各节点可访问
+    --api-server-count=8                     # API server 数量（建议与总进程数一致）
+
+# 节点 2（从节点，仅 worker，无 API server）
+vllm serve deepseek-ai/DeepSeek-V3-0324 \
+    --all2all-backend deepep_low_latency \
+    --tensor-parallel-size 1 \               # 每节点 TP 规模
+    --enable-expert-parallel \               # 启用专家并行
+    --data-parallel-size 16 \                # 总 DP 规模
+    --data-parallel-size-local 8 \           # 本节点 DP 规模
+    --data-parallel-start-rank 8 \           # 本节点的 rank 起始偏移
+    --data-parallel-address 192.168.1.100 \  # 主节点 IP
+    --data-parallel-rpc-port 13345 \         # 与主节点一致
+    --headless                               # 无 API server，仅作为 worker
+```
+
+### 配置要点
+
+- **Headless 模式**：从节点需加 `--headless`，所有客户端请求都由主节点处理
+- **Rank 计算**：`--data-parallel-start-rank` 设置为前序所有节点的本地 DP 规模之和
+- **负载扩展**：主节点的 `--api-server-count` 可根据需求提升并发处理能力
+
+### 网络配置
+
+!!! important "InfiniBand 集群"
+    如果是在 InfiniBand 网络集群环境，请设置如下环境变量以避免初始化卡死：
     ```bash
     export GLOO_SOCKET_IFNAME=eth0
     ```
-    This ensures torch distributed group discovery uses Ethernet instead of InfiniBand for initial setup.
+    这样 torch 分布式组的发现过程会优先使用以太网，而不是 InfiniBand。
 
-## Expert Parallel Load Balancer (EPLB)
+## 专家并行负载均衡（EPLB）
 
-While MoE models are typically trained so that each expert receives a similar number of tokens, in practice the distribution of tokens across experts can be highly skewed. vLLM provides an Expert Parallel Load Balancer (EPLB) to redistribute expert mappings across EP ranks, evening the load across experts.
+虽然 MoE 模型训练时会尽量让各专家分配到的 token 数量相近，但实际推理过程中的 token 分布常常十分不均。vLLM 提供了专家并行负载均衡器（Expert Parallel Load Balancer，EPLB），可以在 EP rank 间重新分配专家映射，实现均匀负载。
 
-### Configuration
+### 配置方式
 
-Enable EPLB with the `--enable-eplb` flag.
+通过 `--enable-eplb` 参数启用 EPLB。
 
-!!! note "Model Support"
-    Currently only DeepSeek V3 architecture is supported.
+!!! note "模型支持情况"
+    目前仅支持 DeepSeek V3 架构。
 
-When enabled, vLLM collects load statistics with every forward pass and periodically rebalances expert distribution.
+启用后，vLLM 会在每次前向推理时收集专家负载数据，并定期自动优化专家分布。
 
-### EPLB Parameters
+### EPLB 参数
 
-Configure EPLB with the `--eplb-config` argument, which accepts a JSON string. The available keys and their descriptions are:
+使用 `--eplb-config` 参数配置 EPLB，传入 JSON 字符串。各可选键及含义如下：
 
-| Parameter | Description | Default |
+| 参数 | 说明 | 默认值 |
 |-----------|-------------|---------|
-| `window_size`| Number of engine steps to track for rebalancing decisions | 1000 |
-| `step_interval`| Frequency of rebalancing (every N engine steps) | 3000 |
-| `log_balancedness` | Log balancedness metrics (avg tokens per expert ÷ max tokens per expert) | `false` |
-| `num_redundant_experts` | Additional global experts per EP rank beyond equal distribution | `0` |
+| `window_size`| 用于均衡决策的数据窗口步数 | 1000 |
+| `step_interval`| 重新分配的周期（每 N 步） | 3000 |
+| `log_balancedness` | 是否记录均衡度（平均分配 token / 最大分配 token） | `false` |
+| `num_redundant_experts` | 每个 EP rank 额外增加的全局专家数 | `0` |
 
-For example:
+例如：
 
 ```bash
 vllm serve Qwen/Qwen3-30B-A3B \
@@ -143,7 +143,7 @@ vllm serve Qwen/Qwen3-30B-A3B \
   --eplb-config '{"window_size":1000,"step_interval":3000,"num_redundant_experts":2,"log_balancedness":true}'
 ```
 
-??? tip "Prefer individual arguments instead of JSON?"
+??? tip "想用独立参数而不是 JSON？"
 
     ```bash
     vllm serve Qwen/Qwen3-30B-A3B \
@@ -154,122 +154,122 @@ vllm serve Qwen/Qwen3-30B-A3B \
             --eplb-config.log_balancedness true
     ```
 
-### Expert Distribution Formula
+### 专家分配公式
 
-- **Default**: Each EP rank has `NUM_TOTAL_EXPERTS ÷ NUM_EP_RANKS` experts
-- **With redundancy**: Each EP rank has `(NUM_TOTAL_EXPERTS + NUM_REDUNDANT_EXPERTS) ÷ NUM_EP_RANKS` experts
+- **默认分配**：每个 EP rank 分配到 `NUM_TOTAL_EXPERTS ÷ NUM_EP_RANKS` 个专家
+- **冗余分配**：每个 EP rank 分配到 `(NUM_TOTAL_EXPERTS + NUM_REDUNDANT_EXPERTS) ÷ NUM_EP_RANKS` 个专家
 
-### Memory Footprint Overhead
+### 显存开销
 
-EPLB uses redundant experts that need to fit in GPU memory. This means that EPLB may not be a good fit for memory constrained environments or when KV cache space is at a premium.
+EPLB 会用到冗余专家，需保证这些专家能全部放入 GPU 显存。如果显存受限或 KV cache 用量较大，EPLB 可能不适合。
 
-This overhead equals `NUM_MOE_LAYERS * BYTES_PER_EXPERT * (NUM_TOTAL_EXPERTS + NUM_REDUNDANT_EXPERTS) ÷ NUM_EP_RANKS`.
-For DeepSeekV3, this is approximately `2.4 GB` for one redundant expert per EP rank.
+开销计算公式为：`NUM_MOE_LAYERS * BYTES_PER_EXPERT * (NUM_TOTAL_EXPERTS + NUM_REDUNDANT_EXPERTS) ÷ NUM_EP_RANKS`。
+以 DeepSeekV3 为例，每个 EP rank 多加一个冗余专家约需 `2.4 GB` 显存。
 
-### Example Command
+### 命令示例
 
-Single node deployment with EPLB enabled:
+单节点 EPLB 部署示例：
 
 ```bash
-# Single node with EPLB load balancing
+# 单节点启用 EPLB 负载均衡
 vllm serve deepseek-ai/DeepSeek-V3-0324 \
-    --tensor-parallel-size 1 \       # Tensor parallelism
-    --data-parallel-size 8 \         # Data parallelism
-    --enable-expert-parallel \       # Enable EP
-    --all2all-backend pplx \         # Use pplx communication backend
-    --enable-eplb \                  # Enable load balancer
+    --tensor-parallel-size 1 \       # 张量并行
+    --data-parallel-size 8 \         # 数据并行
+    --enable-expert-parallel \       # 启用专家并行
+    --all2all-backend pplx \         # pplx 通信后端
+    --enable-eplb \                  # 启用负载均衡
     --eplb-config '{"window_size":1000,"step_interval":3000,"num_redundant_experts":2,"log_balancedness":true}'
 ```
 
-For multi-node deployment, add these EPLB flags to each node's command. We recommend setting `--eplb-config '{"num_redundant_experts":32}'` to 32 in large scale use cases so the most popular experts are always available.
+多节点部署时，请在每个节点命令中添加 EPLB 参数。大规模场景建议设置 `--eplb-config '{"num_redundant_experts":32}'`，确保热点专家总是可用。
 
-## Disaggregated Serving (Prefill/Decode Split)
+## 分离式服务（Prefill/Decode 分离）
 
-For production deployments requiring strict SLA guarantees for time-to-first-token and inter-token latency, disaggregated serving allows independent scaling of prefill and decode operations.
+在生产环境中，为了提升首 token 响应和多 token 生成的延迟表现，可以采用分离式服务架构，分别独立扩展 prefill 和 decode 处理能力。
 
-### Architecture Overview
+### 架构概述
 
-- **Prefill Instance**: Uses `deepep_high_throughput` backend for optimal prefill performance
-- **Decode Instance**: Uses `deepep_low_latency` backend for minimal decode latency  
-- **KV Cache Transfer**: Connects instances via NIXL or other KV connectors
+- **Prefill 实例**：采用 `deepep_high_throughput` 后端，优化 prefill 性能
+- **Decode 实例**：采用 `deepep_low_latency` 后端，最大限度降低 decode 延迟  
+- **KV cache 传递**：通过 NIXL 或其他 KV 连接器实现实例间 KV cache 共享
 
-### Setup Steps
+### 部署步骤
 
-1. **Install gdrcopy/ucx/nixl**: For maximum performance, run the [install_gdrcopy.sh](../../tools/install_gdrcopy.sh) script to install `gdrcopy` (e.g., `install_gdrcopy.sh "${GDRCOPY_OS_VERSION}" "12.8" "x64"`). You can find available OS versions [here](https://developer.download.nvidia.com/compute/redist/gdrcopy/CUDA%2012.8/). If `gdrcopy` is not installed, things will still work with a plain `pip install nixl`, just with lower performance. `nixl` and `ucx` are installed as dependencies via pip. For non-cuda platform to install nixl with non-cuda UCX build, run the [install_nixl_from_source_ubuntu.py](../../tools/install_nixl_from_source_ubuntu.py) script.
+1. **安装 gdrcopy/ucx/nixl**：推荐运行 [install_gdrcopy.sh](../../tools/install_gdrcopy.sh) 脚本安装 `gdrcopy`（例如 `install_gdrcopy.sh "${GDRCOPY_OS_VERSION}" "12.8" "x64"`）。可用版本见[这里](https://developer.download.nvidia.com/compute/redist/gdrcopy/CUDA%2012.8/)。如未安装 gdrcopy，也可通过 `pip install nixl` 使用，性能略低。`nixl` 和 `ucx` 可直接 pip 安装。非 cuda 平台安装 nixl 的非 cuda UCX 版本，可运行 [install_nixl_from_source_ubuntu.py](../../tools/install_nixl_from_source_ubuntu.py)。
 
-2. **Configure Both Instances**: Add this flag to both prefill and decode instances `--kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both"}`. Noted, you may also specify one or multiple NIXL_Backend. Such as: `--kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both", "kv_connector_extra_config":{"backends":["UCX", "GDS"]}}'`
+2. **配置两类实例**：在 prefill 和 decode 实例均添加如下参数：`--kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both"}`。此外也可指定多个 NIXL_Backend，例如：`--kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both", "kv_connector_extra_config":{"backends":["UCX", "GDS"]}}'`
 
-3. **Client Orchestration**: Use the client-side script below to coordinate prefill/decode operations. We are actively working on routing solutions.
+3. **客户端编排**：可用下方示例脚本协调 prefill/decode 操作。我们正在开发更完善的路由方案。
 
-### Client Orchestration Example
+### 客户端编排示例
 
 ```python
 from openai import OpenAI
 import uuid
 
 try:
-    # 1: Set up clients for prefill and decode instances
-    openai_api_key = "EMPTY"  # vLLM doesn't require a real API key
+    # 1: 分别创建 prefill 和 decode 实例的客户端
+    openai_api_key = "EMPTY"  # vLLM 无需真实 API key
     
-    # Replace these IP addresses with your actual instance addresses
+    # 请将 IP 地址替换为实际实例地址
     prefill_client = OpenAI(
         api_key=openai_api_key,
-        base_url="http://192.168.1.100:8000/v1",  # Prefill instance URL
+        base_url="http://192.168.1.100:8000/v1",  # Prefill 实例 URL
     )
     decode_client = OpenAI(
         api_key=openai_api_key,
-        base_url="http://192.168.1.101:8001/v1",  # Decode instance URL  
+        base_url="http://192.168.1.101:8001/v1",  # Decode 实例 URL  
     )
     
-    # Get model name from prefill instance
+    # 获取模型名称
     models = prefill_client.models.list()
     model = models.data[0].id
-    print(f"Using model: {model}")
+    print(f"使用模型: {model}")
 
-    # 2: Prefill Phase
-    # Generate unique request ID to link prefill and decode operations
+    # 2: Prefill 阶段
+    # 生成唯一请求 ID，关联 prefill 与 decode 操作
     request_id = str(uuid.uuid4())
-    print(f"Request ID: {request_id}")
+    print(f"请求 ID: {request_id}")
     
     prefill_response = prefill_client.completions.create(
         model=model,
-        # Prompt must exceed vLLM's block size (16 tokens) for PD to work
+        # Prompt 必须超过 vLLM 的 block size（16 token），PD 才能生效
         prompt="Write a detailed explanation of Paged Attention for Transformers works including the management of KV cache for multi-turn conversations",
-        max_tokens=1,  # Force prefill-only operation
+        max_tokens=1,  # 强制仅 prefill
         extra_body={
             "kv_transfer_params": {
-                "do_remote_decode": True,     # Enable remote decode
-                "do_remote_prefill": False,   # This is the prefill instance
-                "remote_engine_id": None,     # Will be populated by vLLM
-                "remote_block_ids": None,     # Will be populated by vLLM
-                "remote_host": None,          # Will be populated by vLLM
-                "remote_port": None,          # Will be populated by vLLM
+                "do_remote_decode": True,     # 启用远程 decode
+                "do_remote_prefill": False,   # 当前为 prefill 实例
+                "remote_engine_id": None,     # vLLM 自动填充
+                "remote_block_ids": None,     # vLLM 自动填充
+                "remote_host": None,          # vLLM 自动填充
+                "remote_port": None,          # vLLM 自动填充
             }
         },
         extra_headers={"X-Request-Id": request_id},
     )
     
     print("-" * 50)
-    print("✓ Prefill completed successfully")
-    print(f"Prefill response: {prefill_response.choices[0].text}")
+    print("✓ Prefill 完成")
+    print(f"Prefill 返回: {prefill_response.choices[0].text}")
     
-    # 3: Decode Phase
-    # Transfer KV cache parameters from prefill to decode instance
+    # 3: Decode 阶段
+    # 从 prefill 响应中获取 KV cache 参数，传递给 decode 实例
     decode_response = decode_client.completions.create(
         model=model,
-        prompt="This prompt is ignored during decode",  # Original prompt not needed
-        max_tokens=150,  # Generate up to 150 tokens
+        prompt="This prompt is ignored during decode",  # Decode 不处理原始 prompt
+        max_tokens=150,  # 生成最多 150 个 token
         extra_body={
-            "kv_transfer_params": prefill_response.kv_transfer_params  # Pass KV cache info
+            "kv_transfer_params": prefill_response.kv_transfer_params  # 传递 KV cache 信息
         },
-        extra_headers={"X-Request-Id": request_id},  # Same request ID
+        extra_headers={"X-Request-Id": request_id},  # 保持同一请求 ID
     )
     
     print("-" * 50)
-    print("✓ Decode completed successfully")
-    print(f"Final response: {decode_response.choices[0].text}")
+    print("✓ Decode 完成")
+    print(f"最终返回: {decode_response.choices[0].text}")
 
 except Exception as e:
-    print(f"❌ Error during disaggregated serving: {e}")
-    print("Check that both prefill and decode instances are running and accessible")
+    print(f"❌ 分离式服务出错: {e}")
+    print("请检查 prefill 和 decode 实例均已启动且可访问")
 ```

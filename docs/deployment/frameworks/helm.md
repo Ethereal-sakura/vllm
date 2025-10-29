@@ -1,23 +1,23 @@
 # Helm
 
-A Helm chart to deploy vLLM for Kubernetes
+用于在 Kubernetes 上部署 vLLM 的 Helm Chart
 
-Helm is a package manager for Kubernetes. It helps automate the deployment of vLLM applications on Kubernetes. With Helm, you can deploy the same framework architecture with different configurations to multiple namespaces by overriding variable values.
+Helm 是 Kubernetes 的一个包管理工具，可以帮助你自动化部署 vLLM 应用到 Kubernetes 集群中。通过 Helm，你可以在多个命名空间（namespace）下，根据不同需求覆盖变量值，部署统一的架构框架。
 
-This guide will walk you through the process of deploying vLLM with Helm, including the necessary prerequisites, steps for Helm installation and documentation on architecture and values file.
+本指南将带你一步步完成使用 Helm 部署 vLLM 的流程，包括所需的前置条件、Helm 的安装步骤，以及架构和 values 文件的相关说明。
 
-## Prerequisites
+## 前置条件
 
-Before you begin, ensure that you have the following:
+在开始之前，请确保你已经具备以下条件：
 
-- A running Kubernetes cluster
-- NVIDIA Kubernetes Device Plugin (`k8s-device-plugin`): This can be found at [https://github.com/NVIDIA/k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin)
-- Available GPU resources in your cluster
-- An S3 with the model which will be deployed
+- 一个正常运行的 Kubernetes 集群
+- 已部署 NVIDIA Kubernetes Device Plugin（`k8s-device-plugin`）：获取地址 [https://github.com/NVIDIA/k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin)
+- 集群中有可用的 GPU 资源
+- 一个包含待部署模型的 S3 存储
 
-## Installing the chart
+## 安装 Chart
 
-To install the chart with the release name `test-vllm`:
+以 `test-vllm` 作为发布名称安装 Chart 的命令如下：
 
 ```bash
 helm upgrade --install --create-namespace \
@@ -29,72 +29,72 @@ helm upgrade --install --create-namespace \
   --set secrets.s3accesskey=$SECRET_KEY
 ```
 
-## Uninstalling the chart
+## 卸载 Chart
 
-To uninstall the `test-vllm` deployment:
+若需卸载 `test-vllm` 部署，可以执行：
 
 ```bash
 helm uninstall test-vllm --namespace=ns-vllm
 ```
 
-The command removes all the Kubernetes components associated with the
-chart **including persistent volumes** and deletes the release.
+该命令会移除所有与该 Chart 相关的 Kubernetes 组件  
+**包括持久化卷（persistent volumes）**，并删除对应的发布记录。
 
-## Architecture
+## 架构
 
-![helm deployment architecture](../../assets/deployment/architecture_helm_deployment.png)
+![helm 部署架构](../../assets/deployment/architecture_helm_deployment.png)
 
 ## Values
 
-The following table describes configurable parameters of the chart in `values.yaml`:
+下面的表格详细说明了 `values.yaml` 中可配置参数：
 
-| Key | Type | Default | Description |
+| Key | Type | Default | 说明 |
 |-----|------|---------|-------------|
-| autoscaling | object | {"enabled":false,"maxReplicas":100,"minReplicas":1,"targetCPUUtilizationPercentage":80} | Autoscaling configuration |
-| autoscaling.enabled | bool | false | Enable autoscaling |
-| autoscaling.maxReplicas | int | 100 | Maximum replicas |
-| autoscaling.minReplicas | int | 1 | Minimum replicas |
-| autoscaling.targetCPUUtilizationPercentage | int | 80 | Target CPU utilization for autoscaling |
-| configs | object | {} | Configmap |
-| containerPort | int | 8000 | Container port |
-| customObjects | list | [] | Custom Objects configuration |
-| deploymentStrategy | object | {} | Deployment strategy configuration |
-| externalConfigs | list | [] | External configuration |
-| extraContainers | list | [] | Additional containers configuration |
-| extraInit | object | {"pvcStorage":"1Gi","s3modelpath":"relative_s3_model_path/opt-125m", "awsEc2MetadataDisabled": true} | Additional configuration for the init container |
-| extraInit.pvcStorage | string | "1Gi" | Storage size of the s3 |
-| extraInit.s3modelpath | string | "relative_s3_model_path/opt-125m" | Path of the model on the s3 which hosts model weights and config files |
-| extraInit.awsEc2MetadataDisabled | boolean | true | Disables the use of the Amazon EC2 instance metadata service |
-| extraPorts | list | [] | Additional ports configuration |
-| gpuModels | list | ["TYPE_GPU_USED"] | Type of gpu used |
-| image | object | {"command":["vllm","serve","/data/","--served-model-name","opt-125m","--host","0.0.0.0","--port","8000"],"repository":"vllm/vllm-openai","tag":"latest"} | Image configuration |
-| image.command | list | ["vllm","serve","/data/","--served-model-name","opt-125m","--host","0.0.0.0","--port","8000"] | Container launch command |
-| image.repository | string | "vllm/vllm-openai" | Image repository |
-| image.tag | string | "latest" | Image tag |
-| livenessProbe | object | {"failureThreshold":3,"httpGet":{"path":"/health","port":8000},"initialDelaySeconds":15,"periodSeconds":10} | Liveness probe configuration |
-| livenessProbe.failureThreshold | int | 3 | Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive |
-| livenessProbe.httpGet | object | {"path":"/health","port":8000} | Configuration of the kubelet http request on the server |
-| livenessProbe.httpGet.path | string | "/health" | Path to access on the HTTP server |
-| livenessProbe.httpGet.port | int | 8000 | Name or number of the port to access on the container, on which the server is listening |
-| livenessProbe.initialDelaySeconds | int | 15 | Number of seconds after the container has started before liveness probe is initiated |
-| livenessProbe.periodSeconds | int | 10 | How often (in seconds) to perform the liveness probe |
-| maxUnavailablePodDisruptionBudget | string | "" | Disruption Budget Configuration |
-| readinessProbe | object | {"failureThreshold":3,"httpGet":{"path":"/health","port":8000},"initialDelaySeconds":5,"periodSeconds":5} | Readiness probe configuration |
-| readinessProbe.failureThreshold | int | 3 | Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready |
-| readinessProbe.httpGet | object | {"path":"/health","port":8000} | Configuration of the kubelet http request on the server |
-| readinessProbe.httpGet.path | string | "/health" | Path to access on the HTTP server |
-| readinessProbe.httpGet.port | int | 8000 | Name or number of the port to access on the container, on which the server is listening |
-| readinessProbe.initialDelaySeconds | int | 5 | Number of seconds after the container has started before readiness probe is initiated |
-| readinessProbe.periodSeconds | int | 5 | How often (in seconds) to perform the readiness probe |
-| replicaCount | int | 1 | Number of replicas |
-| resources | object | {"limits":{"cpu":4,"memory":"16Gi","nvidia.com/gpu":1},"requests":{"cpu":4,"memory":"16Gi","nvidia.com/gpu":1}} | Resource configuration |
-| resources.limits."nvidia.com/gpu" | int | 1 | Number of GPUs used |
-| resources.limits.cpu | int | 4 | Number of CPUs |
-| resources.limits.memory | string | "16Gi" | CPU memory configuration |
-| resources.requests."nvidia.com/gpu" | int | 1 | Number of GPUs used |
-| resources.requests.cpu | int | 4 | Number of CPUs |
-| resources.requests.memory | string | "16Gi" | CPU memory configuration |
-| secrets | object | {} | Secrets configuration |
-| serviceName | string | "" | Service name |
-| servicePort | int | 80 | Service port |
-| labels.environment | string | test | Environment name |
+| autoscaling | object | {"enabled":false,"maxReplicas":100,"minReplicas":1,"targetCPUUtilizationPercentage":80} | 自动扩缩容相关配置 |
+| autoscaling.enabled | bool | false | 是否启用自动扩缩容 |
+| autoscaling.maxReplicas | int | 100 | 最大副本数 |
+| autoscaling.minReplicas | int | 1 | 最小副本数 |
+| autoscaling.targetCPUUtilizationPercentage | int | 80 | 用于自动扩缩容的目标 CPU 利用率 |
+| configs | object | {} | ConfigMap 配置 |
+| containerPort | int | 8000 | 容器端口 |
+| customObjects | list | [] | 自定义对象相关配置 |
+| deploymentStrategy | object | {} | 部署策略配置 |
+| externalConfigs | list | [] | 外部配置 |
+| extraContainers | list | [] | 额外容器的配置 |
+| extraInit | object | {"pvcStorage":"1Gi","s3modelpath":"relative_s3_model_path/opt-125m", "awsEc2MetadataDisabled": true} | 初始化容器的额外配置 |
+| extraInit.pvcStorage | string | "1Gi" | S3 挂载所需存储空间大小 |
+| extraInit.s3modelpath | string | "relative_s3_model_path/opt-125m" | S3 上存放模型权重和配置文件的路径 |
+| extraInit.awsEc2MetadataDisabled | boolean | true | 是否禁用 Amazon EC2 实例的元数据服务 |
+| extraPorts | list | [] | 额外端口的配置 |
+| gpuModels | list | ["TYPE_GPU_USED"] | 使用的 GPU 类型 |
+| image | object | {"command":["vllm","serve","/data/","--served-model-name","opt-125m","--host","0.0.0.0","--port","8000"],"repository":"vllm/vllm-openai","tag":"latest"} | 镜像相关配置 |
+| image.command | list | ["vllm","serve","/data/","--served-model-name","opt-125m","--host","0.0.0.0","--port","8000"] | 容器启动命令 |
+| image.repository | string | "vllm/vllm-openai" | 镜像仓库 |
+| image.tag | string | "latest" | 镜像标签 |
+| livenessProbe | object | {"failureThreshold":3,"httpGet":{"path":"/health","port":8000},"initialDelaySeconds":15,"periodSeconds":10} | 存活性探针配置 |
+| livenessProbe.failureThreshold | int | 3 | 探针连续失败多少次后，Kubernetes 判定容器不健康 |
+| livenessProbe.httpGet | object | {"path":"/health","port":8000} | kubelet 访问服务的 HTTP 请求配置 |
+| livenessProbe.httpGet.path | string | "/health" | HTTP 服务的健康检查路径 |
+| livenessProbe.httpGet.port | int | 8000 | 容器监听的端口名称或编号 |
+| livenessProbe.initialDelaySeconds | int | 15 | 容器启动后多久开始执行存活性探针 |
+| livenessProbe.periodSeconds | int | 10 | 存活性探针执行的时间间隔（秒） |
+| maxUnavailablePodDisruptionBudget | string | "" | Pod 容忍中断相关配置 |
+| readinessProbe | object | {"failureThreshold":3,"httpGet":{"path":"/health","port":8000},"initialDelaySeconds":5,"periodSeconds":5} | 就绪性探针配置 |
+| readinessProbe.failureThreshold | int | 3 | 探针连续失败多少次后，Kubernetes 判定容器未就绪 |
+| readinessProbe.httpGet | object | {"path":"/health","port":8000} | kubelet 访问服务的 HTTP 请求配置 |
+| readinessProbe.httpGet.path | string | "/health" | HTTP 服务的健康检查路径 |
+| readinessProbe.httpGet.port | int | 8000 | 容器监听的端口名称或编号 |
+| readinessProbe.initialDelaySeconds | int | 5 | 容器启动后多久开始执行就绪性探针 |
+| readinessProbe.periodSeconds | int | 5 | 就绪性探针执行的时间间隔（秒） |
+| replicaCount | int | 1 | 副本数量 |
+| resources | object | {"limits":{"cpu":4,"memory":"16Gi","nvidia.com/gpu":1},"requests":{"cpu":4,"memory":"16Gi","nvidia.com/gpu":1}} | 资源限制和请求配置 |
+| resources.limits."nvidia.com/gpu" | int | 1 | 使用的 GPU 数量 |
+| resources.limits.cpu | int | 4 | 分配的 CPU 核数 |
+| resources.limits.memory | string | "16Gi" | 分配的 CPU 内存 |
+| resources.requests."nvidia.com/gpu" | int | 1 | 申请的 GPU 数量 |
+| resources.requests.cpu | int | 4 | 申请的 CPU 核数 |
+| resources.requests.memory | string | "16Gi" | 申请的内存大小 |
+| secrets | object | {} | 密钥相关配置 |
+| serviceName | string | "" | 服务名称 |
+| servicePort | int | 80 | 服务端口 |
+| labels.environment | string | test | 环境名称 |

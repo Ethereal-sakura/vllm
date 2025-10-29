@@ -1,48 +1,46 @@
-# Troubleshooting
+# 故障排查
 
-This document outlines some troubleshooting strategies you can consider. If you think you've discovered a bug, please [search existing issues](https://github.com/vllm-project/vllm/issues?q=is%3Aissue) first to see if it has already been reported. If not, please [file a new issue](https://github.com/vllm-project/vllm/issues/new/choose), providing as much relevant information as possible.
-
-!!! note
-    Once you've debugged a problem, remember to turn off any debugging environment variables defined, or simply start a new shell to avoid being affected by lingering debugging settings. Otherwise, the system might be slow with debugging functionalities left activated.
-
-## Hangs downloading a model
-
-If the model isn't already downloaded to disk, vLLM will download it from the internet which can take time and depend on your internet connection.
-It's recommended to download the model first using the [huggingface-cli](https://huggingface.co/docs/huggingface_hub/en/guides/cli) and passing the local path to the model to vLLM. This way, you can isolate the issue.
-
-## Hangs loading a model from disk
-
-If the model is large, it can take a long time to load it from disk. Pay attention to where you store the model. Some clusters have shared filesystems across nodes, e.g. a distributed filesystem or a network filesystem, which can be slow.
-It'd be better to store the model in a local disk. Additionally, have a look at the CPU memory usage, when the model is too large it might take a lot of CPU memory, slowing down the operating system because it needs to frequently swap between disk and memory.
+本文档汇总了一些常见的故障排查策略。如果你怀疑遇到了 bug，请先[搜索已有 Issue](https://github.com/vllm-project/vllm/issues?q=is%3Aissue) ，看看是否已经被报告过。如果没有，请[新建 Issue](https://github.com/vllm-project/vllm/issues/new/choose)，并尽量提供详细的相关信息。
 
 !!! note
-    To isolate the model downloading and loading issue, you can use the `--load-format dummy` argument to skip loading the model weights. This way, you can check if the model downloading and loading is the bottleneck.
+    问题排查完成后，记得关闭所有已设置的调试环境变量，或者直接开启一个新的 shell，避免遗留的调试设置影响后续使用。否则系统可能因为开启调试功能而变慢。
 
-## Out of memory
+## 下载模型时卡住
 
-If the model is too large to fit in a single GPU, you will get an out-of-memory (OOM) error. Consider adopting [these options](../configuration/conserving_memory.md) to reduce the memory consumption.
+如果模型还没有下载到本地磁盘，vLLM 会自动从互联网下载模型，下载速度会受到网络状况影响。建议你先使用 [huggingface-cli](https://huggingface.co/docs/huggingface_hub/en/guides/cli) 预先下载模型，然后将本地路径传递给 vLLM，这样可以更好地定位问题。
 
-## Generation quality changed
+## 从磁盘加载模型时卡住
 
-In v0.8.0, the source of default sampling parameters was changed in <https://github.com/vllm-project/vllm/pull/12622>. Prior to v0.8.0, the default sampling parameters came from vLLM's set of neutral defaults. From v0.8.0 onwards, the default sampling parameters come from the `generation_config.json` provided by the model creator.
+如果模型体积较大，从磁盘加载可能需要较长时间。注意模型的存储位置，一些集群环境会使用跨节点共享文件系统（如分布式文件系统或网络文件系统），这类存储通常较慢。建议优先将模型存放在本地磁盘。此外，还要关注 CPU 内存占用情况，如果模型过大，可能会占用大量 CPU 内存，导致操作系统频繁进行磁盘与内存之间的交换，从而拖慢系统性能。
 
-In most cases, this should lead to higher quality responses, because the model creator is likely to know which sampling parameters are best for their model. However, in some cases the defaults provided by the model creator can lead to degraded performance.
+!!! note
+    为了进一步定位模型下载和加载问题，可以使用 `--load-format dummy` 参数跳过加载模型权重。这样可以判断模型下载或加载过程是否是性能瓶颈。
 
-You can check if this is happening by trying the old defaults with `--generation-config vllm` for online and `generation_config="vllm"` for offline. If, after trying this, your generation quality improves we would recommend continuing to use the vLLM defaults and petition the model creator on <https://huggingface.co> to update their default `generation_config.json` so that it produces better quality generations.
+## 内存不足
 
-## Enable more logging
+如果模型太大，无法完全加载到单块 GPU 上，就会出现 OOM（out-of-memory，内存溢出）报错。你可以参考[这些配置选项](../configuration/conserving_memory.md)来降低内存消耗。
 
-If other strategies don't solve the problem, it's likely that the vLLM instance is stuck somewhere. You can use the following environment variables to help debug the issue:
+## 文本生成质量变化
 
-- `export VLLM_LOGGING_LEVEL=DEBUG` to turn on more logging.
-- `export VLLM_LOG_STATS_INTERVAL=1.` to get log statistics more frequently for tracking running queue, waiting queue and cache hit states.
-- `export CUDA_LAUNCH_BLOCKING=1` to identify which CUDA kernel is causing the problem.
-- `export NCCL_DEBUG=TRACE` to turn on more logging for NCCL.
-- `export VLLM_TRACE_FUNCTION=1` to record all function calls for inspection in the log files to tell which function crashes or hangs. (WARNING: This flag will slow down the token generation by **over 100x**. Do not use unless absolutely needed.)
+在 v0.8.0 版本中，[默认采样参数的来源发生了变化](https://github.com/vllm-project/vllm/pull/12622)。v0.8.0 之前，默认采样参数采用 vLLM 的中性默认值。从 v0.8.0 起，默认采样参数取自模型作者提供的 `generation_config.json` 文件。
 
-## Breakpoints
+大多数情况下，这能带来更高质量的输出，因为模型作者通常更了解自己的模型适合哪些采样参数。但也可能部分模型作者设定的默认值反而导致效果变差。
 
-Setting normal `pdb` breakpoints may not work in vLLM's codebase if they are executed in a subprocess. You will experience something like:
+你可以通过尝试使用旧版默认参数进行对比：在线模式添加 `--generation-config vllm`，离线模式使用 `generation_config="vllm"`。如果这样做后生成效果有所提升，建议继续使用 vLLM 的默认参数，并向模型作者在 <https://huggingface.co> 提交反馈，建议他们优化 `generation_config.json` 的默认设置，以提升生成质量。
+
+## 开启更详细的日志
+
+如果以上方法都无法解决问题，vLLM 进程可能卡在某个环节。你可以通过以下环境变量开启更多调试日志，帮助定位问题：
+
+- `export VLLM_LOGGING_LEVEL=DEBUG` ：开启详细日志输出。
+- `export VLLM_LOG_STATS_INTERVAL=1.` ：更高频率输出运行队列、等待队列及缓存命中状态等统计信息。
+- `export CUDA_LAUNCH_BLOCKING=1` ：排查具体是哪个 CUDA kernel 出现问题。
+- `export NCCL_DEBUG=TRACE` ：开启 NCCL 详细日志。
+- `export VLLM_TRACE_FUNCTION=1` ：记录所有函数调用，便于日志定位崩溃或卡死的具体函数。（警告：此选项会严重拖慢生成速度，超100倍，仅在必须时使用。）
+
+## 断点调试
+
+vLLM 的部分代码运行在子进程中，普通的 `pdb` 断点可能无法如预期生效，常见现象如下：
 
 ``` text
   File "/usr/local/uv/cpython-3.12.11-linux-x86_64-gnu/lib/python3.12/bdb.py", line 100, in trace_dispatch
@@ -54,40 +52,37 @@ Setting normal `pdb` breakpoints may not work in vLLM's codebase if they are exe
 bdb.BdbQuit
 ```
 
-One solution is using [forked-pdb](https://github.com/Lightning-AI/forked-pdb). Install with `pip install fpdb` and set a breakpoint with something like:
+一种解决办法是使用 [forked-pdb](https://github.com/Lightning-AI/forked-pdb)。通过 `pip install fpdb` 安装，然后用如下方式设置断点：
 
 ``` python
 __import__('fpdb').ForkedPdb().set_trace()
 ```
 
-Another option is to disable multiprocessing entirely, with the `VLLM_ENABLE_V1_MULTIPROCESSING` environment variable.
-This keeps the scheduler in the same process, so you can use stock `pdb` breakpoints:
+另一种方式是完全关闭多进程，设置 `VLLM_ENABLE_V1_MULTIPROCESSING` 环境变量，这样调度器会在主进程中运行，就可以直接用标准的 `pdb` 断点了：
 
 ``` python
 import os
 os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 ```
 
-## Incorrect network setup
+## 网络配置问题
 
-The vLLM instance cannot get the correct IP address if you have a complicated network config. You can find a log such as `DEBUG 06-10 21:32:17 parallel_state.py:88] world_size=8 rank=0 local_rank=0 distributed_init_method=tcp://xxx.xxx.xxx.xxx:54641 backend=nccl` and the IP address should be the correct one.
-If it's not, override the IP address using the environment variable `export VLLM_HOST_IP=<your_ip_address>`.
+如果你的网络配置较为复杂，vLLM 实例可能无法正确获取本机 IP。你可以在日志中查找类似 `DEBUG 06-10 21:32:17 parallel_state.py:88] world_size=8 rank=0 local_rank=0 distributed_init_method=tcp://xxx.xxx.xxx.xxx:54641 backend=nccl` 的信息，确保 IP 地址是正确的。如果不是，请用环境变量手动指定 IP：`export VLLM_HOST_IP=<your_ip_address>`。
 
-You might also need to set `export NCCL_SOCKET_IFNAME=<your_network_interface>` and `export GLOO_SOCKET_IFNAME=<your_network_interface>` to specify the network interface for the IP address.
+此外，也可能需要设置 `export NCCL_SOCKET_IFNAME=<your_network_interface>` 和 `export GLOO_SOCKET_IFNAME=<your_network_interface>` ，指定 IP 所对应的网络接口。
 
-## Error near `self.graph.replay()`
+## `self.graph.replay()` 附近报错
 
-If vLLM crashes and the error trace captures it somewhere around `self.graph.replay()` in `vllm/worker/model_runner.py`, it is a CUDA error inside CUDAGraph.
-To identify the particular CUDA operation that causes the error, you can add `--enforce-eager` to the command line, or `enforce_eager=True` to the [LLM][vllm.LLM] class to disable the CUDAGraph optimization and isolate the exact CUDA operation that causes the error.
+如果 vLLM 崩溃时，错误堆栈中出现在 `vllm/worker/model_runner.py` 的 `self.graph.replay()` 附近，这通常是 CUDAGraph 内部的 CUDA 错误。你可以在命令行加上 `--enforce-eager` 参数，或者在 [LLM][vllm.LLM] 类中设置 `enforce_eager=True`，以关闭 CUDAGraph 优化，从而进一步定位具体的 CUDA 操作问题。
 
-## Incorrect hardware/driver
+## 硬件或驱动问题
 
-If GPU/CPU communication cannot be established, you can use the following Python script and follow the instructions below to confirm whether the GPU/CPU communication is working correctly.
+如果 GPU/CPU 间通信无法正常建立，可以用下面的 Python 脚本进行检查，并按提示操作，确认 GPU/CPU 通信是否正常。
 
 ??? code
 
     ```python
-    # Test PyTorch NCCL
+    # 测试 PyTorch NCCL
     import torch
     import torch.distributed as dist
     dist.init_process_group(backend="nccl")
@@ -102,7 +97,7 @@ If GPU/CPU communication cannot be established, you can use the following Python
 
     print("PyTorch NCCL is successful!")
 
-    # Test PyTorch GLOO
+    # 测试 PyTorch GLOO
     gloo_group = dist.new_group(ranks=list(range(world_size)), backend="gloo")
     cpu_data = torch.FloatTensor([1,] * 128)
     dist.all_reduce(cpu_data, op=dist.ReduceOp.SUM, group=gloo_group)
@@ -114,14 +109,13 @@ If GPU/CPU communication cannot be established, you can use the following Python
     if world_size <= 1:
         exit()
 
-    # Test vLLM NCCL, with cuda graph
+    # 测试 vLLM NCCL，含 cuda graph
     from vllm.distributed.device_communicators.pynccl import PyNcclCommunicator
 
     pynccl = PyNcclCommunicator(group=gloo_group, device=local_rank)
-    # pynccl is enabled by default for 0.6.5+,
-    # but for 0.6.4 and below, we need to enable it manually.
-    # keep the code for backward compatibility when because people
-    # prefer to read the latest documentation.
+    # pynccl 在 0.6.5+ 版本默认启用，
+    # 0.6.4 及更低版本需手动启用。
+    # 为兼容旧版本，保留此代码。
     pynccl.disabled = False
 
     s = torch.cuda.Stream()
@@ -149,13 +143,13 @@ If GPU/CPU communication cannot be established, you can use the following Python
     dist.destroy_process_group()
     ```
 
-If you are testing with a single node, adjust `--nproc-per-node` to the number of GPUs you want to use:
+如果你在单机环境测试，可以调整 `--nproc-per-node` 参数为你想用的 GPU 数量：
 
 ```bash
 NCCL_DEBUG=TRACE torchrun --nproc-per-node=<number-of-GPUs> test.py
 ```
 
-If you are testing with multi-nodes, adjust `--nproc-per-node` and `--nnodes` according to your setup and set `MASTER_ADDR` to the correct IP address of the master node, reachable from all nodes. Then, run:
+多节点环境下，请根据实际情况调整 `--nproc-per-node` 和 `--nnodes`，并确保 `MASTER_ADDR` 设置为集群主节点的可访问 IP。运行如下命令：
 
 ```bash
 NCCL_DEBUG=TRACE torchrun --nnodes 2 \
@@ -164,23 +158,23 @@ NCCL_DEBUG=TRACE torchrun --nnodes 2 \
     --rdzv_endpoint=$MASTER_ADDR test.py
 ```
 
-If the script runs successfully, you should see the message `sanity check is successful!`.
+如果脚本正常运行，会看到 `sanity check is successful!` 的提示。
 
-If the test script hangs or crashes, usually it means the hardware/drivers are broken in some sense. You should try to contact your system administrator or hardware vendor for further assistance. As a common workaround, you can try to tune some NCCL environment variables, such as `export NCCL_P2P_DISABLE=1` to see if it helps. Please check [their documentation](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html) for more information. Please only use these environment variables as a temporary workaround, as they might affect the performance of the system. The best solution is still to fix the hardware/drivers so that the test script can run successfully.
+如果脚本卡住或崩溃，通常说明硬件或驱动存在问题，建议联系系统管理员或硬件厂商进一步排查。常见的临时措施可以尝试设置 NCCL 相关环境变量，比如 `export NCCL_P2P_DISABLE=1`，有时能缓解问题。更多信息请查阅 [官方文档](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html) 。不过这些设置只建议临时使用，可能会影响系统性能。最佳方案还是修复硬件或驱动，使脚本可以正常运行。
 
 !!! note
-    A multi-node environment is more complicated than a single-node one. If you see errors such as `torch.distributed.DistNetworkError`, it is likely that the network/DNS setup is incorrect. In that case, you can manually assign node rank and specify the IP via command line arguments:
+    多节点环境配置比单节点更为复杂。如果遇到类似 `torch.distributed.DistNetworkError` 的报错，往往是网络或 DNS 配置有误。此时可以手动分配节点 rank，并通过命令行参数指定 IP：
 
-    - In the first node, run `NCCL_DEBUG=TRACE torchrun --nnodes 2 --nproc-per-node=2 --node-rank 0 --master_addr $MASTER_ADDR test.py`.
-    - In the second node, run `NCCL_DEBUG=TRACE torchrun --nnodes 2 --nproc-per-node=2 --node-rank 1 --master_addr $MASTER_ADDR test.py`.
+    - 在第一个节点运行：`NCCL_DEBUG=TRACE torchrun --nnodes 2 --nproc-per-node=2 --node-rank 0 --master_addr $MASTER_ADDR test.py`
+    - 在第二个节点运行：`NCCL_DEBUG=TRACE torchrun --nnodes 2 --nproc-per-node=2 --node-rank 1 --master_addr $MASTER_ADDR test.py`
 
-    Adjust `--nproc-per-node`, `--nnodes`, and `--node-rank` according to your setup, being sure to execute different commands (with different `--node-rank`) on different nodes.
+    请根据实际环境调整 `--nproc-per-node`、`--nnodes` 和 `--node-rank` 参数，并确保每个节点执行的命令（及 `--node-rank`）不同。
 
-## Python multiprocessing
+## Python 多进程
 
-### `RuntimeError` Exception
+### `RuntimeError` 异常
 
-If you have seen a warning in your logs like this:
+如果日志中出现如下警告：
 
 ```console
 WARNING 12-11 14:50:37 multiproc_worker_utils.py:281] CUDA was previously
@@ -190,9 +184,9 @@ WARNING 12-11 14:50:37 multiproc_worker_utils.py:281] CUDA was previously
     for more information.
 ```
 
-or an error from Python that looks like this:
+或者出现类似如下 Python 报错：
 
-??? console "Logs"
+??? console "日志"
 
     ```console
     RuntimeError:
@@ -214,8 +208,7 @@ or an error from Python that looks like this:
             section in https://docs.python.org/3/library/multiprocessing.html
     ```
 
-then you must update your Python code to guard usage of `vllm` behind a `if
-__name__ == '__main__':` block. For example, instead of this:
+此时你需要将所有对 `vllm` 的调用放在 `if __name__ == '__main__':` 判断内部。比如不要这样写：
 
 ```python
 import vllm
@@ -223,7 +216,7 @@ import vllm
 llm = vllm.LLM(...)
 ```
 
-try this instead:
+而应该这样写：
 
 ```python
 if __name__ == '__main__':
@@ -232,9 +225,9 @@ if __name__ == '__main__':
     llm = vllm.LLM(...)
 ```
 
-## `torch.compile` Error
+## `torch.compile` 报错
 
-vLLM heavily depends on `torch.compile` to optimize the model for better performance, which introduces the dependency on the `torch.compile` functionality and the `triton` library. By default, we use `torch.compile` to [optimize some functions](https://github.com/vllm-project/vllm/pull/10406) in the model. Before running vLLM, you can check if `torch.compile` is working as expected by running the following script:
+vLLM 严重依赖 `torch.compile` 优化模型性能，因此需要 `torch.compile` 功能和 `triton` 库支持。默认情况下，vLLM 会利用 `torch.compile` [优化部分函数](https://github.com/vllm-project/vllm/pull/10406)。你可以在运行 vLLM 前，通过以下脚本验证 `torch.compile` 是否可用：
 
 ??? code
 
@@ -243,7 +236,7 @@ vLLM heavily depends on `torch.compile` to optimize the model for better perform
 
     @torch.compile
     def f(x):
-        # a simple function to test torch.compile
+        # 一个用来测试 torch.compile 的简单函数
         x = x + 1
         x = x * 2
         x = x.sin()
@@ -253,11 +246,11 @@ vLLM heavily depends on `torch.compile` to optimize the model for better perform
     print(f(x))
     ```
 
-If it raises errors from `torch/_inductor` directory, usually it means you have a custom `triton` library that is not compatible with the version of PyTorch you are using. See <https://github.com/vllm-project/vllm/issues/12219> for example.
+如果报错信息中包含 `torch/_inductor` 相关内容，通常说明你安装的 `triton` 版本与当前 PyTorch 不兼容。可参考 <https://github.com/vllm-project/vllm/issues/12219> 进一步排查。
 
-## Model failed to be inspected
+## 模型检查失败
 
-If you see an error like:
+如果出现如下报错：
 
 ```text
   File "vllm/model_executor/models/registry.py", line xxx, in _raise_for_unsupported
@@ -265,13 +258,11 @@ If you see an error like:
 ValueError: Model architectures ['<arch>'] failed to be inspected. Please check the logs for more details.
 ```
 
-It means that vLLM failed to import the model file.
-Usually, it is related to missing dependencies or outdated binaries in the vLLM build.
-Please read the logs carefully to determine the root cause of the error.
+说明 vLLM 导入模型文件失败。通常与依赖缺失或 vLLM 编译的二进制版本过老有关。请仔细阅读日志，定位具体报错原因。
 
-## Model not supported
+## 模型不受支持
 
-If you see an error like:
+如果出现如下报错：
 
 ```text
 Traceback (most recent call last):
@@ -281,7 +272,7 @@ Traceback (most recent call last):
 TypeError: 'NoneType' object is not iterable
 ```
 
-or:
+或：
 
 ```text
   File "vllm/model_executor/models/registry.py", line xxx, in _raise_for_unsupported
@@ -289,15 +280,15 @@ or:
 ValueError: Model architectures ['<arch>'] are not supported for now. Supported architectures: [...]
 ```
 
-But you are sure that the model is in the [list of supported models](../models/supported_models.md), there may be some issue with vLLM's model resolution. In that case, please follow [these steps](../configuration/model_resolution.md) to explicitly specify the vLLM implementation for the model.
+但你确定该模型已经列在[支持的模型列表](../models/supported_models.md)里，说明 vLLM 的模型识别可能存在问题。此时建议参考[这里的步骤](../configuration/model_resolution.md)手动指定 vLLM 对该模型的实现方式。
 
-## Failed to infer device type
+## 设备类型推断失败
 
-If you see an error like `RuntimeError: Failed to infer device type`, it means that vLLM failed to infer the device type of the runtime environment. You can check [the code](../../vllm/platforms/__init__.py) to see how vLLM infers the device type and why it is not working as expected. After [this PR](https://github.com/vllm-project/vllm/pull/14195), you can also set the environment variable `VLLM_LOGGING_LEVEL=DEBUG` to see more detailed logs to help debug the issue.
+如果看到类似 `RuntimeError: Failed to infer device type` 的报错，说明 vLLM 无法判断当前环境的设备类型。你可以查看[相关代码](../../vllm/platforms/__init__.py) ，了解 vLLM 是如何推断设备类型的，并分析为何没有按预期工作。自 [这个 PR](https://github.com/vllm-project/vllm/pull/14195) 后，也可以设置环境变量 `VLLM_LOGGING_LEVEL=DEBUG` 输出更详细日志，辅助排查问题。
 
 ## NCCL error: unhandled system error during `ncclCommInitRank`
 
-If your serving workload uses GPUDirect RDMA for distributed serving across multiple nodes and encounters an error during `ncclCommInitRank`, with no clear error message even with `NCCL_DEBUG=INFO` set, it might look like this:
+如果你的服务场景采用 GPUDirect RDMA 跨节点分布式部署，且在 `ncclCommInitRank` 阶段遇到报错，哪怕设置了 `NCCL_DEBUG=INFO` 依然没有明确错误信息，日志大致如下：
 
 ```text
 Error executing method 'init_device'. This might cause deadlock in distributed execution.
@@ -314,10 +305,8 @@ Traceback (most recent call last):
 ...
 ```
 
-This indicates vLLM failed to initialize the NCCL communicator, possibly due to a missing `IPC_LOCK` linux capability  or an unmounted `/dev/shm`. Refer to [Enabling GPUDirect RDMA](../serving/parallelism_scaling.md#enabling-gpudirect-rdma) for guidance on properly configuring the environment for GPUDirect RDMA.
+这说明 vLLM 初始化 NCCL 通信器失败，常见原因包括缺少 `IPC_LOCK` Linux 权限或 `/dev/shm` 目录没有挂载。请参考 [启用 GPUDirect RDMA 的官方说明](../serving/parallelism_scaling.md#enabling-gpudirect-rdma) ，确保环境配置正确。
 
-## Known Issues
+## 已知问题
 
-- In `v0.5.2`, `v0.5.3`, and `v0.5.3.post1`, there is a bug caused by [zmq](https://github.com/zeromq/pyzmq/issues/2000) , which can occasionally cause vLLM to hang depending on the machine configuration. The solution is to upgrade to the latest version of `vllm` to include the [fix](https://github.com/vllm-project/vllm/pull/6759).
-- To address a memory overhead issue in older NCCL versions (see [bug](https://github.com/NVIDIA/nccl/issues/1234)), vLLM versions `>= 0.4.3, <= 0.10.1.1` would set the environment variable `NCCL_CUMEM_ENABLE=0`. External processes connecting to vLLM also needed to set this variable to prevent hangs or crashes. Since the underlying NCCL bug was fixed in NCCL 2.22.3, this override was removed in newer vLLM versions to allow for NCCL performance optimizations.
-- In some PCIe machines (e.g. machines without NVLink), if you see an error like `transport/shm.cc:590 NCCL WARN Cuda failure 217 'peer access is not supported between these two devices'`, it's likely caused by a driver bug. See [this issue](https://github.com/NVIDIA/nccl/issues/1838) for more details. In that case, you can try to set `NCCL_CUMEM_HOST_ENABLE=0` to disable the feature, or upgrade your driver to the latest version.
+- 在 `v0.5.2`、`v0.5.3` 和 `v0.5.3.post1` 版本

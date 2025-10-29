@@ -4,22 +4,22 @@
     <img src="https://i.ibb.co/hHcScTT/Screenshot-2024-06-13-at-10-14-54.png" alt="vLLM_plus_cerebrium"/>
 </p>
 
-vLLM can be run on a cloud based GPU machine with [Cerebrium](https://www.cerebrium.ai/), a serverless AI infrastructure platform that makes it easier for companies to build and deploy AI based applications.
+你可以通过 [Cerebrium](https://www.cerebrium.ai/) 在云端 GPU 服务器上运行 vLLM。Cerebrium 是一个无服务器（serverless）AI 基础设施平台，让企业更轻松地构建并部署基于 AI 的应用。
 
-To install the Cerebrium client, run:
+要安装 Cerebrium 客户端，请执行：
 
 ```bash
 pip install cerebrium
 cerebrium login
 ```
 
-Next, create your Cerebrium project, run:
+接下来，创建你的 Cerebrium 项目，运行：
 
 ```bash
 cerebrium init vllm-project
 ```
 
-Next, to install the required packages, add the following to your cerebrium.toml:
+然后，为了安装所需依赖，在你的 cerebrium.toml 文件中添加如下内容：
 
 ```toml
 [cerebrium.deployment]
@@ -29,7 +29,7 @@ docker_base_image_url = "nvidia/cuda:12.1.1-runtime-ubuntu22.04"
 vllm = "latest"
 ```
 
-Next, let us add our code to handle inference for the LLM of your choice (`mistralai/Mistral-7B-Instruct-v0.1` for this example), add the following code to your `main.py`:
+之后，我们来添加推理代码，用于调用你选择的大语言模型（LLM，这里以 `mistralai/Mistral-7B-Instruct-v0.1` 为例）。将以下代码添加到你的 `main.py` 文件中：
 
 ??? code
 
@@ -43,7 +43,7 @@ Next, let us add our code to handle inference for the LLM of your choice (`mistr
         sampling_params = SamplingParams(temperature=temperature, top_p=top_p)
         outputs = llm.generate(prompts, sampling_params)
 
-        # Print the outputs.
+        # 打印输出结果。
         results = []
         for output in outputs:
             prompt = output.prompt
@@ -53,15 +53,15 @@ Next, let us add our code to handle inference for the LLM of your choice (`mistr
         return {"results": results}
     ```
 
-Then, run the following code to deploy it to the cloud:
+之后，运行以下命令将其部署到云端：
 
 ```bash
 cerebrium deploy
 ```
 
-If successful, you should be returned a CURL command that you can call inference against. Just remember to end the url with the function name you are calling (in our case`/run`)
+如果部署成功，你会收到一个 CURL 命令，可以用来调用你的模型接口进行推理。注意，URL 结尾要加上你要调用的函数名（这里是 `/run`）
 
-??? console "Command"
+??? console "命令示例"
 
     ```bash
     curl -X POST https://api.cortex.cerebrium.ai/v4/p-xxxxxx/vllm/run \
@@ -77,9 +77,9 @@ If successful, you should be returned a CURL command that you can call inference
     }'
     ```
 
-You should get a response like:
+你将会收到类似如下的响应：
 
-??? console "Response"
+??? console "响应示例"
 
     ```json
     {
@@ -108,4 +108,4 @@ You should get a response like:
     }
     ```
 
-You now have an autoscaling endpoint where you only pay for the compute you use!
+现在你已经拥有了一个自动扩缩容的推理接口，按实际用量计费！

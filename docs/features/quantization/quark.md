@@ -1,43 +1,36 @@
 # AMD Quark
 
-Quantization can effectively reduce memory and bandwidth usage, accelerate computation and improve
-throughput while with minimal accuracy loss. vLLM can leverage [Quark](https://quark.docs.amd.com/latest/),
-the flexible and powerful quantization toolkit, to produce performant quantized models to run on AMD GPUs. Quark has specialized support for quantizing large language models with weight,
-activation and kv-cache quantization and cutting-edge quantization algorithms like
-AWQ, GPTQ, Rotation and SmoothQuant.
+量化（Quantization）能够有效减少内存和带宽的使用，加速计算，提升吞吐量，同时只带来极小的精度损失。vLLM 支持借助 [Quark](https://quark.docs.amd.com/latest/) —— 一款灵活且强大的量化工具包，在 AMD GPU 上生成高性能的量化模型。Quark 针对大语言模型提供了专业的支持，包括权重、激活值和 kv-cache 的量化，以及前沿的量化算法，如 AWQ、GPTQ、Rotation 和 SmoothQuant。
 
-## Quark Installation
+## Quark 安装
 
-Before quantizing models, you need to install Quark. The latest release of Quark can be installed with pip:
+在开始量化模型之前，需要先安装 Quark。可以使用 pip 安装最新版 Quark：
 
 ```bash
 pip install amd-quark
 ```
 
-You can refer to [Quark installation guide](https://quark.docs.amd.com/latest/install.html)
-for more installation details.
+更多安装细节，可以参考 [Quark 安装指南](https://quark.docs.amd.com/latest/install.html)。
 
-Additionally, install `vllm` and `lm-evaluation-harness` for evaluation:
+此外，还需要安装 `vllm` 和 `lm-evaluation-harness` 以便进行评测：
 
 ```bash
 pip install vllm git+https://github.com/EleutherAI/lm-evaluation-harness.git@206b7722158f58c35b7ffcd53b035fdbdda5126d#egg=lm-eval[api]
 ```
 
-## Quantization Process
+## 量化流程
 
-After installing Quark, we will use an example to illustrate how to use Quark.
-The Quark quantization process can be listed for 5 steps as below:
+安装好 Quark 后，我们以一个例子来演示如何使用 Quark。整个量化流程主要分为以下 5 个步骤：
 
-1. Load the model
-2. Prepare the calibration dataloader
-3. Set the quantization configuration
-4. Quantize the model and export
-5. Evaluation in vLLM
+1. 加载模型
+2. 准备校准（calibration）数据加载器
+3. 设置量化配置
+4. 执行量化并导出模型
+5. 在 vLLM 中评估
 
-### 1. Load the Model
+### 1. 加载模型
 
-Quark uses [Transformers](https://huggingface.co/docs/transformers/en/index)
-to fetch model and tokenizer.
+Quark 通过 [Transformers](https://huggingface.co/docs/transformers/en/index) 获取模型和分词器。
 
 ??? code
 
@@ -58,11 +51,9 @@ to fetch model and tokenizer.
     tokenizer.pad_token = tokenizer.eos_token
     ```
 
-### 2. Prepare the Calibration Dataloader
+### 2. 准备校准数据加载器
 
-Quark uses the [PyTorch Dataloader](https://pytorch.org/tutorials/beginner/basics/data_tutorial.html)
-to load calibration data. For more details about how to use calibration datasets efficiently, please refer
-to [Adding Calibration Datasets](https://quark.docs.amd.com/latest/pytorch/calibration_datasets.html).
+Quark 使用 [PyTorch Dataloader](https://pytorch.org/tutorials/beginner/basics/data_tutorial.html) 来加载校准数据。关于如何高效使用校准数据集，可以参考 [添加校准数据集](https://quark.docs.amd.com/latest/pytorch/calibration_datasets.html)。
 
 ??? code
 
@@ -73,7 +64,7 @@ to [Adding Calibration Datasets](https://quark.docs.amd.com/latest/pytorch/calib
     BATCH_SIZE = 1
     NUM_CALIBRATION_DATA = 512
 
-    # Load the dataset and get calibration data.
+    # 加载数据集并获取校准数据。
     dataset = load_dataset("mit-han-lab/pile-val-backup", split="validation")
     text_data = dataset["text"][:NUM_CALIBRATION_DATA]
 
@@ -91,19 +82,12 @@ to [Adding Calibration Datasets](https://quark.docs.amd.com/latest/pytorch/calib
     )
     ```
 
-### 3. Set the Quantization Configuration
+### 3. 设置量化配置
 
-We need to set the quantization configuration, you can check
-[quark config guide](https://quark.docs.amd.com/latest/pytorch/user_guide_config_description.html)
-for further details. Here we use FP8 per-tensor quantization on weight, activation,
-kv-cache and the quantization algorithm is AutoSmoothQuant.
+我们需要设置量化配置。更多配置细节可以参考 [quark 配置指南](https://quark.docs.amd.com/latest/pytorch/user_guide_config_description.html)。本例中，我们对权重、激活和 kv-cache 都采用 FP8 每张量（per-tensor）量化，所用算法为 AutoSmoothQuant。
 
 !!! note
-    Note the quantization algorithm needs a JSON config file and the config file is located in
-    [Quark Pytorch examples](https://quark.docs.amd.com/latest/pytorch/pytorch_examples.html),
-    under the directory `examples/torch/language_modeling/llm_ptq/models`. For example,
-    AutoSmoothQuant config file for Llama is
-    `examples/torch/language_modeling/llm_ptq/models/llama/autosmoothquant_config.json`.
+    注意：量化算法需要一个 JSON 配置文件，配置文件位于 [Quark Pytorch 示例](https://quark.docs.amd.com/latest/pytorch/pytorch_examples.html)中的 `examples/torch/language_modeling/llm_ptq/models` 目录。例如，Llama 的 AutoSmoothQuant 配置文件是 `examples/torch/language_modeling/llm_ptq/models/llama/autosmoothquant_config.json`。
 
 ??? code
 
@@ -112,19 +96,19 @@ kv-cache and the quantization algorithm is AutoSmoothQuant.
                                         FP8E4M3PerTensorSpec,
                                         load_quant_algo_config_from_file)
 
-    # Define fp8/per-tensor/static spec.
+    # 定义 fp8/每张量/静态 的量化规格。
     FP8_PER_TENSOR_SPEC = FP8E4M3PerTensorSpec(
         observer_method="min_max",
         is_dynamic=False,
     ).to_quantization_spec()
 
-    # Define global quantization config, input tensors and weight apply FP8_PER_TENSOR_SPEC.
+    # 定义全局量化配置，输入张量和权重均采用 FP8_PER_TENSOR_SPEC。
     global_quant_config = QuantizationConfig(
         input_tensors=FP8_PER_TENSOR_SPEC,
         weight=FP8_PER_TENSOR_SPEC,
     )
 
-    # Define quantization config for kv-cache layers, output tensors apply FP8_PER_TENSOR_SPEC.
+    # 针对 kv-cache 层的量化配置，输出张量同样采用 FP8_PER_TENSOR_SPEC。
     KV_CACHE_SPEC = FP8_PER_TENSOR_SPEC
     kv_cache_layer_names_for_llama = ["*k_proj", "*v_proj"]
     kv_cache_quant_config = {
@@ -137,7 +121,7 @@ kv-cache and the quantization algorithm is AutoSmoothQuant.
     }
     layer_quant_config = kv_cache_quant_config.copy()
 
-    # Define algorithm config by config file.
+    # 通过配置文件定义算法配置。
     LLAMA_AUTOSMOOTHQUANT_CONFIG_FILE = "examples/torch/language_modeling/llm_ptq/models/llama/autosmoothquant_config.json"
     algo_config = load_quant_algo_config_from_file(LLAMA_AUTOSMOOTHQUANT_CONFIG_FILE)
 
@@ -151,13 +135,9 @@ kv-cache and the quantization algorithm is AutoSmoothQuant.
     )
     ```
 
-### 4. Quantize the Model and Export
+### 4. 执行量化并导出模型
 
-Then we can apply the quantization. After quantizing, we need to freeze the
-quantized model first before exporting. Note that we need to export model with format of
-HuggingFace `safetensors`, you can refer to
-[HuggingFace format exporting](https://quark.docs.amd.com/latest/pytorch/export/quark_export_hf.html)
-for more exporting format details.
+接下来可以执行量化。量化完成后，需先“冻结”量化后的模型再导出。注意导出时需采用 HuggingFace 的 `safetensors` 格式，更多细节可以参考 [HuggingFace 格式导出说明](https://quark.docs.amd.com/latest/pytorch/export/quark_export_hf.html)。
 
 ??? code
 
@@ -166,19 +146,19 @@ for more exporting format details.
     from quark.torch import ModelQuantizer, ModelExporter
     from quark.torch.export import ExporterConfig, JsonExporterConfig
 
-    # Apply quantization.
+    # 应用量化过程。
     quantizer = ModelQuantizer(quant_config)
     quant_model = quantizer.quantize_model(model, calib_dataloader)
 
-    # Freeze quantized model to export.
+    # 冻结量化后的模型，便于导出。
     freezed_model = quantizer.freeze(model)
 
-    # Define export config.
+    # 定义导出配置。
     LLAMA_KV_CACHE_GROUP = ["*k_proj", "*v_proj"]
     export_config = ExporterConfig(json_export_config=JsonExporterConfig())
     export_config.json_export_config.kv_cache_group = LLAMA_KV_CACHE_GROUP
 
-    # Model: Llama-2-70b-chat-hf-w-fp8-a-fp8-kvcache-fp8-pertensor-autosmoothquant
+    # 模型名举例：Llama-2-70b-chat-hf-w-fp8-a-fp8-kvcache-fp8-pertensor-autosmoothquant
     EXPORT_DIR = MODEL_ID.split("/")[1] + "-w-fp8-a-fp8-kvcache-fp8-pertensor-autosmoothquant"
     exporter = ModelExporter(config=export_config, export_dir=EXPORT_DIR)
     with torch.no_grad():
@@ -189,35 +169,34 @@ for more exporting format details.
         )
     ```
 
-### 5. Evaluation in vLLM
+### 5. 在 vLLM 中评估
 
-Now, you can load and run the Quark quantized model directly through the LLM entrypoint:
+现在，你可以通过 LLM 的入口，直接加载并运行 Quark 量化后的模型：
 
 ??? code
 
     ```python
     from vllm import LLM, SamplingParams
 
-    # Sample prompts.
+    # 示例 prompt
     prompts = [
         "Hello, my name is",
         "The president of the United States is",
         "The capital of France is",
         "The future of AI is",
     ]
-    # Create a sampling params object.
+    # 创建采样参数对象
     sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
 
-    # Create an LLM.
+    # 创建 LLM 实例
     llm = LLM(
         model="Llama-2-70b-chat-hf-w-fp8-a-fp8-kvcache-fp8-pertensor-autosmoothquant",
         kv_cache_dtype="fp8",
         quantization="quark",
     )
-    # Generate texts from the prompts. The output is a list of RequestOutput objects
-    # that contain the prompt, generated text, and other information.
+    # 基于 prompts 生成文本，输出为 RequestOutput 对象列表，包含 prompt、生成文本及其它信息
     outputs = llm.generate(prompts, sampling_params)
-    # Print the outputs.
+    # 打印输出结果
     print("\nGenerated Outputs:\n" + "-" * 60)
     for output in outputs:
         prompt = output.prompt
@@ -227,7 +206,7 @@ Now, you can load and run the Quark quantized model directly through the LLM ent
         print("-" * 60)
     ```
 
-Or, you can use `lm_eval` to evaluate accuracy:
+你也可以用 `lm_eval` 工具评测准确率：
 
 ```bash
 lm_eval --model vllm \
@@ -235,13 +214,9 @@ lm_eval --model vllm \
   --tasks gsm8k
 ```
 
-## Quark Quantization Script
+## Quark 量化脚本
 
-In addition to the example of Python API above, Quark also offers a
-[quantization script](https://quark.docs.amd.com/latest/pytorch/example_quark_torch_llm_ptq.html)
-to quantize large language models more conveniently. It supports quantizing models with variety
-of different quantization schemes and optimization algorithms. It can export the quantized model
-and run evaluation tasks on the fly. With the script, the example above can be:
+除了上面 Python API 的例子外，Quark 还提供了一个更为便捷的 [量化脚本](https://quark.docs.amd.com/latest/pytorch/example_quark_torch_llm_ptq.html)，可以快速完成大语言模型的量化任务。该脚本支持多种量化方案与优化算法，可以直接导出量化模型并支持评测。使用脚本，上述示例可以简化为：
 
 ```bash
 python3 quantize_quark.py --model_dir meta-llama/Llama-2-70b-chat-hf \
@@ -254,23 +229,23 @@ python3 quantize_quark.py --model_dir meta-llama/Llama-2-70b-chat-hf \
                           --tasks gsm8k
 ```
 
-## Using OCP MX (MXFP4, MXFP6) models
+## 使用 OCP MX (MXFP4, MXFP6) 模型
 
-vLLM supports loading MXFP4 and MXFP6 models quantized offline through AMD Quark, compliant with [Open Compute Project (OCP) specification](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf).
+vLLM 支持加载通过 AMD Quark 离线量化得到的 MXFP4 和 MXFP6 模型，并符合 [Open Compute Project (OCP) 规范](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf)。
 
-The scheme currently only supports dynamic quantization for activations.
+目前，该方案只支持对激活进行动态量化。
 
-Example usage, after installing the latest AMD Quark release:
+安装最新版 AMD Quark 后，示例用法如下：
 
 ```bash
 vllm serve fxmarty/qwen_1.5-moe-a2.7b-mxfp4 --tensor-parallel-size 1
-# or, for a model using fp6 activations and fp4 weights:
+# 或者，对于激活使用 fp6、权重使用 fp4 的模型：
 vllm serve fxmarty/qwen1.5_moe_a2.7b_chat_w_fp4_a_fp6_e2m3 --tensor-parallel-size 1
 ```
 
-A simulation of the matrix multiplication execution in MXFP4/MXFP6 can be run on devices that do not support OCP MX operations natively (e.g. AMD Instinct MI325, MI300 and MI250), dequantizing weights from FP4/FP6 to half precision on the fly, using a fused kernel. This is useful e.g. to evaluate FP4/FP6 models using vLLM, or alternatively to benefit from the ~2.5-4x memory savings (compared to float16 and bfloat16).
+在不原生支持 OCP MX 操作的设备（如 AMD Instinct MI325、MI300 和 MI250）上，可以通过模拟方式运行 MXFP4/MXFP6 的矩阵乘法：权重会从 FP4/FP6 动态反量化为 half 精度，并采用融合 kernel。这样可用于在 vLLM 中评估 FP4/FP6 模型，或者用以获得约 2.5-4 倍的显存节省（相较于 float16 和 bfloat16）。
 
-To generate offline models quantized using MXFP4 data type, the easiest approach is to use AMD Quark's [quantization script](https://quark.docs.amd.com/latest/pytorch/example_quark_torch_llm_ptq.html), as an example:
+要生成 MXFP4 数据类型的离线量化模型，推荐直接使用 AMD Quark 的 [量化脚本](https://quark.docs.amd.com/latest/pytorch/example_quark_torch_llm_ptq.html)。示例：
 
 ```bash
 python quantize_quark.py --model_dir Qwen/Qwen1.5-MoE-A2.7B-Chat \
@@ -281,4 +256,4 @@ python quantize_quark.py --model_dir Qwen/Qwen1.5-MoE-A2.7B-Chat \
     --group_size 32
 ```
 
-The current integration supports [all combination of FP4, FP6_E3M2, FP6_E2M3](https://github.com/vllm-project/vllm/blob/main/vllm/model_executor/layers/quantization/utils/ocp_mx_utils.py) used for either weights or activations. Eventually, some target hardware support mixed precision GEMM, as AMD Instinct MI350/MI355, for example using FP6 for activations and FP4 for weights.
+目前的集成支持 [FP4、FP6_E3M2、FP6_E2M3 的任意组合](https://github.com/vllm-project/vllm/blob/main/vllm/model_executor/layers/quantization/utils/ocp_mx_utils.py)，可用于权重或激活。部分目标硬件（如 AMD Instinct MI350/MI355）已支持混合精度 GEMM，例如激活用 FP6、权重用 FP4。
