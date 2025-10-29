@@ -1,0 +1,36 @@
+name: Deploy MkDocs to GitHub Pages
+
+on:
+  push:
+    branches:
+      - translation-zh  # 当推送到 translation-zh 分支时触发
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史，用于 git-revision-date 插件
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements/docs.txt
+
+      - name: Build and deploy to GitHub Pages
+        run: |
+          mkdocs gh-deploy --force --clean --verbose
+        env:
+          # 设置站点 URL（根据你的 GitHub 用户名和仓库名）
+          READTHEDOCS_CANONICAL_URL: https://ethereal-sakura.github.io/vllm/
